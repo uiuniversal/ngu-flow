@@ -41,6 +41,7 @@ export class FlowService {
   panY = 0;
   gridSize = 1;
   arrows: Arrow[] = [];
+  zoomContainer: HTMLElement;
 
   update(children: FlowOptions[]) {
     this.items.clear();
@@ -59,6 +60,10 @@ export class FlowService {
 
   get list() {
     return Array.from(this.items.values());
+  }
+
+  get zRect() {
+    return this.zoomContainer.getBoundingClientRect();
   }
 }
 
@@ -150,6 +155,7 @@ export class FlowChildComponent implements OnInit {
   private onMouseMove = (event: MouseEvent) => {
     if (this.isDragging) {
       event.stopPropagation();
+      const zRect = this.flow.zRect;
       const x =
         Math.round(
           (event.clientX - this.flow.panX - this.offsetX) /
@@ -161,8 +167,8 @@ export class FlowChildComponent implements OnInit {
             (this.flow.gridSize * this.flow.scale)
         ) * this.flow.gridSize;
 
-      this.position.x = x;
-      this.position.y = y;
+      this.position.x = x - zRect.left;
+      this.position.y = y - zRect.top;
       this.flow.arrowsChange.next(this.position);
       this.updatePosition(x, y);
     }
@@ -241,7 +247,8 @@ export class FlowChildComponent implements OnInit {
       :host {
         --grid-size: 20px;
         display: block;
-        height: 100vh;
+        height: 100%;
+        width: 100%;
         position: relative;
         overflow: hidden;
         /* background-image: linear-gradient(
@@ -311,6 +318,7 @@ export class FlowComponent implements AfterContentInit, OnDestroy {
     public flow: FlowService,
     private ngZone: NgZone
   ) {
+    this.flow.zoomContainer = this.el.nativeElement;
     this.flow.arrowsChange.subscribe((e) => this.updateArrows(e));
     this.ngZone.runOutsideAngular(() => {
       this.el.nativeElement.addEventListener('wheel', this.zoomHandle);
@@ -332,6 +340,7 @@ export class FlowComponent implements AfterContentInit, OnDestroy {
   private startDraggingZoomContainer = (event: MouseEvent) => {
     event.stopPropagation();
     this.isDraggingZoomContainer = true;
+    const containerRect = this.el.nativeElement.getBoundingClientRect();
     this.initialX = event.clientX - this.flow.panX;
     this.initialY = event.clientY - this.flow.panY;
   };
@@ -446,6 +455,7 @@ export class FlowComponent implements AfterContentInit, OnDestroy {
   }
 
   updateArrows(e?: FlowOptions) {
+    const containerRect = this.el.nativeElement.getBoundingClientRect();
     // Clear existing arrows
     const childObj = this.children.toArray().reduce((acc, curr) => {
       acc[curr.position.id] = curr;
@@ -540,9 +550,10 @@ export class FlowComponent implements AfterContentInit, OnDestroy {
     }
 
     const dotEl = childDots[dotIndex];
+    const zRect = this.zoomContainer.nativeElement.getBoundingClientRect();
     const rect = dotEl.nativeElement.getBoundingClientRect();
-    const x = (rect.x + rect.width / 2 - panX) / scale;
-    const y = (rect.y + rect.height / 2 - panY) / scale;
+    const x = (rect.x + rect.width / 2 - panX - zRect.left) / scale;
+    const y = (rect.y + rect.height / 2 - panY - zRect.top) / scale;
 
     return { ...item, x, y, dotIndex };
   }
@@ -579,7 +590,7 @@ export class FlowComponent implements AfterContentInit, OnDestroy {
   ): number[] {
     const ids = [];
     const closestDots = new Map<string, number>();
-  
+
     const findClosestDot = (depId: string) => {
       const dep = this.list.find((item) => item.id === depId);
       if (dep) {
@@ -587,40 +598,43 @@ export class FlowComponent implements AfterContentInit, OnDestroy {
         const childDots = child.dots.toArray();
         let minDistance = Number.MAX_VALUE;
         let closestDotIndex = 0;
-  
+
+        const zRect = this.zoomContainer.nativeElement.getBoundingClientRect();
+
         childDots.forEach((dotEl, index) => {
           const rect = dotEl.nativeElement.getBoundingClientRect();
-          const x = (rect.x + rect.width / 2 - panX) / scale;
-          const y = (rect.y + rect.height / 2 - panY) / scale;
-  
+          const x = (rect.x + rect.width / 2 - panX - zRect.left) / scale;
+          const y = (rect.y + rect.height / 2 - panY - zRect.top) / scale;
+
           const dx = dep.x - x;
           const dy = dep.y - y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-  
+
           if (distance < minDistance) {
             minDistance = distance;
             closestDotIndex = index;
           }
         });
-  
+
         closestDots.set(depId, closestDotIndex);
       }
     };
-  
+
     // Handle dependencies
     ids.push(...item.deps);
-  
+
     // Assuming reverseDepsMap is a map that you've created to track reverse dependencies
     const reverseDeps = this.reverseDepsMap.get(item.id) || [];
     ids.push(...reverseDeps);
-  
+
     // Get all the closestDots
     ids.forEach(findClosestDot);
-  
-    const arr = Array.from(new Set(ids.map(x => closestDots.get(x) as number))); // Remove duplicates
+
+    const arr = Array.from(
+      new Set(ids.map((x) => closestDots.get(x) as number))
+    ); // Remove duplicates
     return dep ? [closestDots.get(dep) as number] : arr;
   }
-  
 
   calculatePath(start: FlowOptions, end: FlowOptions) {
     const dx = end.x - start.x;
@@ -663,9 +677,14 @@ export class FlowComponent implements AfterContentInit, OnDestroy {
     FlowChildComponent,
   ],
   template: `
-    <app-flow>
-      <div [flowChild]="item" *ngFor="let item of list">{{ item.id }}</div>
-    </app-flow>
+    <button (click)="trigger()">Trigger</button>
+    <div class="flex items-center justify-center h-[800px]">
+      <app-flow class="max-w-[80%] max-h-[70%] border">
+        <div class="card" [flowChild]="item" *ngFor="let item of list">
+          {{ item.id }}
+        </div>
+      </app-flow>
+    </div>
   `,
   styleUrls: ['./app.component.scss'],
 })
@@ -683,5 +702,24 @@ export class AppComponent {
       { x: 860, y: 300, id: '5', deps: ['3'] },
       { x: 240, y: 460, id: '6', deps: ['1'] },
     ];
+    // this.list = [
+    //   { x: 40, y: 40, id: '1', deps: [] },
+    //   { x: 200, y: 40, id: '2', deps: ['1'] },
+    //   { x: 360, y: 40, id: '3', deps: ['2'] },
+    //   { x: 520, y: 40, id: '4', deps: ['2'] },
+    //   { x: 40, y: 200, id: '5', deps: ['1'] },
+    //   { x: 200, y: 200, id: '6', deps: ['5'] },
+    //   { x: 360, y: 200, id: '7', deps: ['5'] },
+    //   { x: 520, y: 200, id: '8', deps: ['6', '7'] },
+    //   { x: 200, y: 360, id: '9', deps: ['6'] },
+    //   { x: 360, y: 360, id: '10', deps: ['7'] },
+    //   { x: 520, y: 360, id: '11', deps: ['8'] },
+    //   { x: 200, y: 520, id: '12', deps: ['9'] },
+    //   { x: 360, y: 520, id: '13', deps: ['10'] },
+    //   { x: 520, y: 520, id: '14', deps: ['11'] },
+    //   { x: 360, y: 680, id: '15', deps: ['12', '13', '14'] },
+    // ];
   }
+
+  trigger() {}
 }
