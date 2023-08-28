@@ -10,7 +10,7 @@ import {
   NgZone,
   ViewChildren,
   ViewChild,
-  HostListener,
+  OnDestroy,
 } from '@angular/core';
 import { CommonModule, NgForOf } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
@@ -24,14 +24,23 @@ interface FlowOptions {
   deps: string[];
 }
 
+interface Arrow {
+  d: any;
+  deps: string[];
+  startDot: number; // Index of the starting dot
+  endDot: number; // Index of the ending dot
+}
+
 @Injectable()
 export class FlowService {
   readonly items = new Map<string, FlowOptions>();
   arrowsChange = new Subject<FlowOptions>();
   deps = new Map<string, string[]>();
-
+  scale = 1;
+  panX = 0;
+  panY = 0;
   gridSize = 1;
-  arrows: { d: any; deps: string[] }[] = [];
+  arrows: Arrow[] = [];
 
   update(children: FlowOptions[]) {
     this.items.clear();
@@ -58,14 +67,10 @@ export class FlowService {
   imports: [CommonModule],
   selector: '[flowChild]',
   template: `<ng-content></ng-content>
-    <div #dot class="dot" [ngClass]="isLeft ? 'dot-left' : 'invisible'"></div>
-    <div #dot class="dot" [ngClass]="isRight ? 'dot-right' : 'invisible'"></div>
-    <!-- <div #dot class="dot" [ngClass]="isTop ? 'dot-top' : 'invisible'"></div> -->
-    <!-- <div
-      #dot
-      class="dot"
-      [ngClass]="isBottom ? 'dot-bottom' : 'invisible'"
-    ></div>  --> `,
+    <div #dot class="dot dot-left"></div>
+    <div #dot class="dot dot-right"></div>
+    <div #dot class="dot dot-top"></div>
+    <div #dot class="dot dot-bottom"></div>`,
   styles: [
     `
       .dot {
@@ -113,21 +118,8 @@ export class FlowChildComponent implements OnInit {
 
   positionChange = new Subject<{ x: number; y: number }>();
 
-  // @HostListener('mousedown', ['$event'])
-  // onMousedown(event: MouseEvent) {
-  //   this.isDragging = true;
-  //   const rect = this.el.nativeElement.getBoundingClientRect();
-  //   this.offsetX = event.clientX - rect.x;
-  //   this.offsetY = event.clientY - rect.y;
-  // }
-
-  // @HostListener('document:mouseup', ['$event'])
-  // onMouseup(event: MouseEvent) {
-  //   this.isDragging = false;
-  // }
-
   constructor(
-    private el: ElementRef<HTMLDivElement>,
+    public el: ElementRef<HTMLDivElement>,
     private flow: FlowService,
     private ngZone: NgZone
   ) {
@@ -136,31 +128,17 @@ export class FlowChildComponent implements OnInit {
     // track mouse move outside angular
     this.ngZone.runOutsideAngular(() => {
       // mouse move event
-      document.addEventListener('mousemove', (event) => {
-        if (this.isDragging) {
-          this.ngZone.run(() => {
-            const x =
-              Math.round((event.clientX - this.offsetX) / this.flow.gridSize) *
-              this.flow.gridSize;
-            const y =
-              Math.round((event.clientY - this.offsetY) / this.flow.gridSize) *
-              this.flow.gridSize;
-
-            this.position.x = x;
-            this.position.y = y;
-            this.flow.arrowsChange.next(this.position);
-            this.updatePosition(x, y);
-          });
-        }
-      });
+      document.addEventListener('mousemove', this.onMouseMove);
 
       // mouse up event
       this.el.nativeElement.addEventListener('mouseup', (event) => {
+        event.stopPropagation();
         this.isDragging = false;
       });
 
       // mouse down event
       this.el.nativeElement.addEventListener('mousedown', (event) => {
+        event.stopPropagation();
         this.isDragging = true;
         const rect = this.el.nativeElement.getBoundingClientRect();
         this.offsetX = event.clientX - rect.x;
@@ -169,73 +147,29 @@ export class FlowChildComponent implements OnInit {
     });
   }
 
+  private onMouseMove = (event: MouseEvent) => {
+    if (this.isDragging) {
+      event.stopPropagation();
+      const x =
+        Math.round(
+          (event.clientX - this.flow.panX - this.offsetX) /
+            (this.flow.gridSize * this.flow.scale)
+        ) * this.flow.gridSize;
+      const y =
+        Math.round(
+          (event.clientY - this.flow.panY - this.offsetY) /
+            (this.flow.gridSize * this.flow.scale)
+        ) * this.flow.gridSize;
+
+      this.position.x = x;
+      this.position.y = y;
+      this.flow.arrowsChange.next(this.position);
+      this.updatePosition(x, y);
+    }
+  };
+
   ngOnInit() {
     this.updatePosition(this.position.x, this.position.y);
-  }
-
-  // @HostListener('document:mousemove', ['$event'])
-  // onMousemove(event: MouseEvent) {
-  //   if (this.isDragging) {
-  //     const x =
-  //       Math.round((event.clientX - this.offsetX) / this.flow.gridSize) *
-  //       this.flow.gridSize;
-  //     const y =
-  //       Math.round((event.clientY - this.offsetY) / this.flow.gridSize) *
-  //       this.flow.gridSize;
-
-  //     this.position.x = x;
-  //     this.position.y = y;
-  //     this.flow.arrowsChange.next(this.position);
-  //     this.updatePosition(x, y);
-  //   }
-  // }
-
-  get isLeft() {
-    const ids = this.flow.deps.get(this.position.id);
-    let isDep = ids?.some((id) => {
-      const item = this.flow.items.get(id);
-      if (item) {
-        return item.x < this.position.x;
-      }
-      return false;
-    });
-
-    // check whether the deps is left
-    const item = this.flow.items.get(this.position.id);
-    if (!isDep && item) {
-      isDep = item.deps.some((id) => {
-        const item = this.flow.items.get(id);
-        if (item) {
-          return item.x < this.position.x;
-        }
-        return false;
-      });
-    }
-    return isDep;
-  }
-
-  get isRight() {
-    const ids = this.flow.deps.get(this.position.id);
-    let isDep = ids?.some((id) => {
-      const item = this.flow.items.get(id);
-      if (item) {
-        return item.x > this.position.x;
-      }
-      return false;
-    });
-
-    // check whether the deps is right
-    const item = this.flow.items.get(this.position.id);
-    if (!isDep && item) {
-      isDep = item.deps.some((id) => {
-        const item = this.flow.items.get(id);
-        if (item) {
-          return item.x > this.position.x;
-        }
-        return false;
-      });
-    }
-    return isDep;
   }
 
   private updatePosition(x: number, y: number) {
@@ -308,6 +242,8 @@ export class FlowChildComponent implements OnInit {
         --grid-size: 20px;
         display: block;
         height: 100vh;
+        position: relative;
+        overflow: hidden;
         /* background-image: linear-gradient(
             0deg,
             rgba(0, 0, 0, 0.1) 1px,
@@ -331,8 +267,9 @@ export class FlowChildComponent implements OnInit {
         position: absolute;
         top: 0;
         left: 0;
-        right: 0;
-        bottom: 0;
+        height: 100%;
+        width: 100%;
+        transform-origin: 0 0;
         /* background-image: linear-gradient(
             0deg,
             rgba(0, 0, 0, 0.1) 1px,
@@ -343,16 +280,18 @@ export class FlowChildComponent implements OnInit {
       }
 
       svg {
-        position: absolute; /* New */
-        top: 0; /* New */
-        left: 0; /* New */
-        width: 100%; /* New */
-        height: 100%; /* New */
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: visible;
       }
     `,
   ],
 })
-export class FlowComponent implements AfterContentInit {
+export class FlowComponent implements AfterContentInit, OnDestroy {
   @ContentChildren(FlowChildComponent) children: QueryList<FlowChildComponent> =
     new QueryList();
 
@@ -361,36 +300,102 @@ export class FlowComponent implements AfterContentInit {
   @ViewChild('svg') svg: ElementRef<SVGSVGElement>;
   @ViewChild('g') g: ElementRef<SVGGElement>;
 
-  scale = 1;
-  panX = 0;
-  panY = 0;
+  isDraggingZoomContainer: boolean;
+  initialX: number;
+  initialY: number;
+  readonly reverseDepsMap = new Map<string, string[]>();
+  readonly closestDots = new Map<string, number>();
 
-  @HostListener('wheel', ['$event'])
-  onWheel(event: WheelEvent) {
-    const scaleAmount = 0.02; // You can adjust this to control the scale amount
-    const scaleDirection = event.deltaY < 0 ? 1 : -1;
-    const newScale = Math.max(this.scale + scaleDirection * scaleAmount, 0.1); // Prevent scaling to zero or negative
-
-    // Get the bounding box of the host element
-    const bbox = this.el.nativeElement.getBoundingClientRect();
-
-    // Translate the window coordinates of the mouse event to the coordinate space of the host element
-    const x = event.clientX - bbox.left;
-    const y = event.clientY - bbox.top;
-
-    // Update the pan to center the zoom around the mouse position
-    this.panX -= (x - this.panX) * (newScale - this.scale);
-    this.panY -= (y - this.panY) * (newScale - this.scale);
-
-    // Update the scale
-    this.scale = newScale;
-
-    // Apply the zoom and the pan
-    this.zoomContainer.nativeElement.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+  constructor(
+    private el: ElementRef<HTMLElement>,
+    public flow: FlowService,
+    private ngZone: NgZone
+  ) {
+    this.flow.arrowsChange.subscribe((e) => this.updateArrows(e));
+    this.ngZone.runOutsideAngular(() => {
+      this.el.nativeElement.addEventListener('wheel', this.zoomHandle);
+      this.el.nativeElement.addEventListener(
+        'mousedown',
+        this.startDraggingZoomContainer
+      );
+      this.el.nativeElement.addEventListener(
+        'mouseup',
+        this.stopDraggingZoomContainer
+      );
+      this.el.nativeElement.addEventListener(
+        'mousemove',
+        this.dragZoomContainer
+      );
+    });
   }
 
-  constructor(private el: ElementRef, public flow: FlowService) {
-    this.flow.arrowsChange.subscribe(() => this.updateArrows());
+  private startDraggingZoomContainer = (event: MouseEvent) => {
+    event.stopPropagation();
+    this.isDraggingZoomContainer = true;
+    this.initialX = event.clientX - this.flow.panX;
+    this.initialY = event.clientY - this.flow.panY;
+  };
+
+  private stopDraggingZoomContainer = (event: MouseEvent) => {
+    event.stopPropagation();
+    this.isDraggingZoomContainer = false;
+  };
+
+  private dragZoomContainer = (event: MouseEvent) => {
+    if (this.isDraggingZoomContainer) {
+      event.stopPropagation();
+      this.flow.panX = event.clientX - this.initialX;
+      this.flow.panY = event.clientY - this.initialY;
+      this.updateZoomContainer();
+    }
+  };
+
+  private zoomHandle = (event: WheelEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    const scaleDirection = event.deltaY < 0 ? 1 : -1;
+    this.setZoom1(event.clientX, event.clientY, scaleDirection);
+  };
+
+  private setZoom1(clientX: number, clientY: number, scaleDirection: number) {
+    const { scale, panX, panY } = this.setZoom(
+      clientX,
+      clientY,
+      scaleDirection,
+      this.flow.panX,
+      this.flow.panY,
+      this.flow.scale
+    );
+    this.flow.scale = scale;
+    this.flow.panX = panX;
+    this.flow.panY = panY;
+
+    // Apply the zoom and the pan
+    this.updateZoomContainer();
+  }
+
+  private setZoom(
+    wheelClientX: number,
+    wheelClientY: number,
+    scaleDirection: number,
+    panX: number,
+    panY: number,
+    scale: number
+  ) {
+    const scaleAmount = 0.01;
+
+    // Calculate new scale
+    const newScale = scale + scaleDirection * scaleAmount;
+
+    // Calculate new pan values to keep the zoom point in the same position on the screen
+    const newPanX = wheelClientX + ((panX - wheelClientX) * newScale) / scale;
+    const newPanY = wheelClientY + ((panY - wheelClientY) * newScale) / scale;
+
+    return { scale: newScale, panX: newPanX, panY: newPanY };
+  }
+
+  private updateZoomContainer() {
+    this.zoomContainer.nativeElement.style.transform = `translate(${this.flow.panX}px, ${this.flow.panY}px) scale(${this.flow.scale})`;
   }
 
   ngAfterContentInit() {
@@ -419,6 +424,8 @@ export class FlowComponent implements AfterContentInit {
           this.flow.arrows.push({
             d: `M${item.x},${item.y} L${dep.x},${dep.y}`,
             deps: [item.id, dep.id],
+            startDot: 0,
+            endDot: 0,
           });
         }
       });
@@ -438,12 +445,27 @@ export class FlowComponent implements AfterContentInit {
     this.updateArrows();
   }
 
-  updateArrows() {
+  updateArrows(e?: FlowOptions) {
     // Clear existing arrows
     const childObj = this.children.toArray().reduce((acc, curr) => {
       acc[curr.position.id] = curr;
       return acc;
     }, {} as Record<string, FlowChildComponent>);
+
+    // Handle reverse dependencies
+    this.closestDots.clear();
+    this.reverseDepsMap.clear();
+    this.list.forEach((item) => {
+      item.deps.forEach((depId) => {
+        if (!this.reverseDepsMap.has(depId)) {
+          this.reverseDepsMap.set(depId, []);
+        }
+        this.reverseDepsMap.get(depId)!.push(item.id);
+      });
+    });
+
+    // Create a reverse dependency map
+    this.updateDotVisibility(childObj);
 
     // Calculate new arrows
     this.flow.arrows.forEach((arrow) => {
@@ -451,10 +473,44 @@ export class FlowComponent implements AfterContentInit {
       const fromItem = childObj[from];
       const toItem = childObj[to];
       if (fromItem && toItem) {
-        arrow.d = this.calculatePath(
-          this.getDot(childObj, fromItem.position, toItem.position),
-          this.getDot(childObj, toItem.position, fromItem.position)
+        const fromClosestDots = this.getClosestDots(
+          childObj,
+          fromItem.position,
+          this.flow.scale,
+          this.flow.panX,
+          this.flow.panY
         );
+        const toClosestDots = this.getClosestDots(
+          childObj,
+          toItem.position,
+          this.flow.scale,
+          this.flow.panX,
+          this.flow.panY,
+          from
+        );
+
+        // Assuming 0 is a default value, replace it with actual logic
+        const startDotIndex = fromClosestDots[0] || 0;
+        const endDotIndex = toClosestDots[0] || 0;
+
+        const startDot = this.getDotByIndex(
+          childObj,
+          fromItem.position,
+          startDotIndex,
+          this.flow.scale,
+          this.flow.panX,
+          this.flow.panY
+        );
+        const endDot = this.getDotByIndex(
+          childObj,
+          toItem.position,
+          endDotIndex,
+          this.flow.scale,
+          this.flow.panX,
+          this.flow.panY
+        );
+
+        arrow.d = this.calculatePath(startDot, endDot);
       }
 
       // the path element from viewChildren is not updated, so we need to update it manually
@@ -467,33 +523,104 @@ export class FlowComponent implements AfterContentInit {
     });
   }
 
-  private getDot(
+  private getDotByIndex(
     childObj: Record<string, FlowChildComponent>,
     item: FlowOptions,
-    dep: FlowOptions
+    dotIndex: number,
+    scale: number,
+    panX: number,
+    panY: number
   ) {
-    // based on the item and dep, we need to know whether the item is top or bottom or left or right
-    const isDepLeft = dep.x < item.x;
-    const isDepRight = dep.x > item.x;
-    // const isDepTop = dep.y < item.y;
-    // const isDepBottom = dep.y > item.y;
-
-    const i = [isDepLeft, isDepRight].indexOf(true);
-
     const child = childObj[item.id];
-    const childDotEl = child.dots.get(i);
-    let childX = 0;
-    let childY = 0;
-    if (childDotEl) {
-      const childDot = childDotEl.nativeElement.getBoundingClientRect();
-      childX = childDot.x + childDot.width / 2;
-      childY = childDot.y + childDot.height / 2;
-    }
-    const r = { ...item, x: childX, y: childY };
+    const childDots = child.dots.toArray();
 
-    // console.log('childDotEl', childDotEl, i, item.deps, dep.id, r);
-    return r;
+    // Make sure the dot index is within bounds
+    if (dotIndex < 0 || dotIndex >= childDots.length) {
+      throw new Error(`Invalid dot index: ${dotIndex}`);
+    }
+
+    const dotEl = childDots[dotIndex];
+    const rect = dotEl.nativeElement.getBoundingClientRect();
+    const x = (rect.x + rect.width / 2 - panX) / scale;
+    const y = (rect.y + rect.height / 2 - panY) / scale;
+
+    return { ...item, x, y, dotIndex };
   }
+
+  private updateDotVisibility(childObj: Record<string, FlowChildComponent>) {
+    Object.keys(childObj).forEach((id) => {
+      const child = childObj[id];
+      const position = child.position;
+      const dots = child.dots.toArray();
+
+      const closestDots = this.getClosestDots(
+        childObj,
+        position,
+        this.flow.scale,
+        this.flow.panX,
+        this.flow.panY
+      );
+
+      dots.forEach((dot, index) => {
+        dot.nativeElement.style.visibility = closestDots.includes(index)
+          ? 'visible'
+          : 'hidden';
+      });
+    });
+  }
+
+  private getClosestDots(
+    childObj: Record<string, FlowChildComponent>,
+    item: FlowOptions,
+    scale: number,
+    panX: number,
+    panY: number,
+    dep?: string
+  ): number[] {
+    const ids = [];
+    const closestDots = new Map<string, number>();
+  
+    const findClosestDot = (depId: string) => {
+      const dep = this.list.find((item) => item.id === depId);
+      if (dep) {
+        const child = childObj[item.id];
+        const childDots = child.dots.toArray();
+        let minDistance = Number.MAX_VALUE;
+        let closestDotIndex = 0;
+  
+        childDots.forEach((dotEl, index) => {
+          const rect = dotEl.nativeElement.getBoundingClientRect();
+          const x = (rect.x + rect.width / 2 - panX) / scale;
+          const y = (rect.y + rect.height / 2 - panY) / scale;
+  
+          const dx = dep.x - x;
+          const dy = dep.y - y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+  
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestDotIndex = index;
+          }
+        });
+  
+        closestDots.set(depId, closestDotIndex);
+      }
+    };
+  
+    // Handle dependencies
+    ids.push(...item.deps);
+  
+    // Assuming reverseDepsMap is a map that you've created to track reverse dependencies
+    const reverseDeps = this.reverseDepsMap.get(item.id) || [];
+    ids.push(...reverseDeps);
+  
+    // Get all the closestDots
+    ids.forEach(findClosestDot);
+  
+    const arr = Array.from(new Set(ids.map(x => closestDots.get(x) as number))); // Remove duplicates
+    return dep ? [closestDots.get(dep) as number] : arr;
+  }
+  
 
   calculatePath(start: FlowOptions, end: FlowOptions) {
     const dx = end.x - start.x;
@@ -519,6 +646,10 @@ export class FlowComponent implements AfterContentInit {
       return `M${startX} ${startY} C${cp1x} ${cp1y} ${cp2x} ${cp2y} ${endX} ${endY}`;
     }
   }
+
+  ngOnDestroy(): void {
+    this.el.nativeElement.removeEventListener('wheel', this.zoomHandle);
+  }
 }
 
 @Component({
@@ -531,19 +662,26 @@ export class FlowComponent implements AfterContentInit {
     ContainerComponent,
     FlowChildComponent,
   ],
-  template: `<app-flow>
-    <div [flowChild]="item" *ngFor="let item of list">{{ item.id }}</div>
-  </app-flow> `,
+  template: `
+    <app-flow>
+      <div [flowChild]="item" *ngFor="let item of list">{{ item.id }}</div>
+    </app-flow>
+  `,
   styleUrls: ['./app.component.scss'],
 })
 export class AppComponent {
   title = 'angular-flow';
 
-  list: FlowOptions[] = [
-    { x: 240, y: 160, id: '1', deps: [] },
-    { x: 560, y: 20, id: '2', deps: ['1'] },
-    { x: 560, y: 300, id: '3', deps: ['1'] },
-    { x: 860, y: 20, id: '4', deps: ['2'] },
-    { x: 860, y: 300, id: '5', deps: ['3'] },
-  ];
+  list: FlowOptions[];
+
+  constructor() {
+    this.list = [
+      { x: 240, y: 160, id: '1', deps: [] },
+      { x: 560, y: 20, id: '2', deps: ['1'] },
+      { x: 560, y: 300, id: '3', deps: ['1'] },
+      { x: 860, y: 20, id: '4', deps: ['2'] },
+      { x: 860, y: 300, id: '5', deps: ['3'] },
+      { x: 240, y: 460, id: '6', deps: ['1'] },
+    ];
+  }
 }
