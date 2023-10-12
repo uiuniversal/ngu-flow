@@ -1,3 +1,7 @@
 {
-    "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "typescript.referencesCodeLens.enabled": true,
+  "typescript.implementationsCodeLens.enabled": true,
+  "javascript.inlayHints.parameterTypes.enabled": true,
+  "javascript.inlayHints.variableTypes.enabled": true
 }

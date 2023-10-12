@@ -14,9 +14,13 @@
   left: 318px;
   top: 263px;
   width: calc(10px + (10px * var(--scale)));
-  height: calc(10px + (10px * var(--scale)));;
+  height: calc(10px + (10px * var(--scale)));
   position: fixed;
   background: blue;
   z-index: 124;
   pointer-events: none;
+}
+
+button {
+  @apply p-1 border;
 }
