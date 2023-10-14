@@ -1,358 +1,88 @@
 import { FlowOptions } from './app.component';
-import { Connections } from './connections';
+import { ChildInfo, Connections } from './connections';
 
 describe('Connections', () => {
   let connections: Connections;
 
+  function t(position: FlowOptions, width = 200, height = 200): ChildInfo {
+    return { position, elRect: { width, height } as DOMRect };
+  }
+
+  it('should return the proper index _findClosestConnectionPoints', () => {
+    let list = [
+      t({ x: 0, y: 0, id: '1', deps: [] }),
+      t({ x: 300, y: 150, id: '5', deps: ['1'] }),
+    ];
+
+    check(list, [1, 3]);
+    check(list.reverse(), [1, 3]);
+
+    list = [
+      t({ x: 300, y: -150, id: '2', deps: ['1'] }),
+      t({ x: 600, y: -300, id: '3', deps: ['2'] }),
+    ];
+    check(list, [1, 3]);
+
+    list = [
+      t({ x: 46, y: -470, id: '3', deps: ['2'] }),
+      t({ x: 300, y: -150, id: '2', deps: ['1'] }),
+    ];
+    check(list, [3, 1]);
+
+    list = [
+      t({ x: 300, y: -150, id: '2', deps: ['1'] }),
+      t({ x: 450, y: -422, id: '3', deps: ['2'] }),
+    ];
+    check(list, [0, 2]);
+
+    function check(list: ChildInfo[], expected: [number, number]) {
+      connections = new Connections(list);
+      const actual = connections._findClosestConnectionPoints(list[0], list[1]);
+      expect(actual).toEqual(expected);
+    }
+  });
+
   it('should calc the closest dot', () => {
-    let list: FlowOptions[] = [
-      { x: 40, y: 40, id: '1', deps: [] },
-      { x: 200, y: 40, id: '2', deps: ['1'] },
+    let list: ChildInfo[] = [
+      t({ x: 0, y: 0, id: '1', deps: [] }),
+      t({ x: 300, y: 40, id: '2', deps: ['1'] }),
     ];
-    connections = new Connections(list);
 
-    let childObj = {
-      '1': {
-        dots: [
-          {
-            x: 174.796875,
-            y: 110,
-            width: 10,
-            height: 10,
-            top: 110,
-            right: 184.796875,
-            bottom: 120,
-            left: 174.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 244.796875,
-            y: 160,
-            width: 10,
-            height: 10,
-            top: 160,
-            right: 254.796875,
-            bottom: 170,
-            left: 244.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 174.796875,
-            y: 310,
-            width: 10,
-            height: 10,
-            top: 310,
-            right: 184.796875,
-            bottom: 320,
-            left: 174.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 94.796875,
-            y: 160,
-            width: 10,
-            height: 10,
-            top: 160,
-            right: 104.796875,
-            bottom: 170,
-            left: 94.796875,
-            toJSON: () => {},
-          },
-        ],
-      },
-      '2': {
-        dots: [
-          {
-            x: 334.796875,
-            y: 110,
-            width: 10,
-            height: 10,
-            top: 110,
-            right: 344.796875,
-            bottom: 120,
-            left: 334.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 404.796875,
-            y: 160,
-            width: 10,
-            height: 10,
-            top: 160,
-            right: 414.796875,
-            bottom: 170,
-            left: 404.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 334.796875,
-            y: 310,
-            width: 10,
-            height: 10,
-            top: 310,
-            right: 344.796875,
-            bottom: 320,
-            left: 334.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 254.796875,
-            y: 160,
-            width: 10,
-            height: 10,
-            top: 160,
-            right: 264.796875,
-            bottom: 170,
-            left: 254.796875,
-            toJSON: () => {},
-          },
-        ],
-      },
-    };
-
-    let val = connections.getClosestDotsSimplified(childObj, list[0], '');
-    expect(val).toEqual([1]);
-
-    val = connections.getClosestDotsSimplified(childObj, list[0], '2');
-    expect(val).toEqual([1]);
-
-    val = connections.getClosestDotsSimplified(childObj, list[1], '');
-    expect(val).toEqual([3]);
-
-    childObj = {
-      '1': {
-        dots: [
-          {
-            x: 174.796875,
-            y: 110,
-            width: 10,
-            height: 10,
-            top: 110,
-            right: 184.796875,
-            bottom: 120,
-            left: 174.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 244.796875,
-            y: 160,
-            width: 10,
-            height: 10,
-            top: 160,
-            right: 254.796875,
-            bottom: 170,
-            left: 244.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 174.796875,
-            y: 310,
-            width: 10,
-            height: 10,
-            top: 310,
-            right: 184.796875,
-            bottom: 320,
-            left: 174.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 94.796875,
-            y: 160,
-            width: 10,
-            height: 10,
-            top: 160,
-            right: 104.796875,
-            bottom: 170,
-            left: 94.796875,
-            toJSON: () => {},
-          },
-        ],
-      },
-      '2': {
-        dots: [
-          {
-            x: 366.796875,
-            y: 111,
-            width: 10,
-            height: 10,
-            top: 111,
-            right: 376.796875,
-            bottom: 121,
-            left: 366.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 436.796875,
-            y: 161,
-            width: 10,
-            height: 10,
-            top: 161,
-            right: 446.796875,
-            bottom: 171,
-            left: 436.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 366.796875,
-            y: 311,
-            width: 10,
-            height: 10,
-            top: 311,
-            right: 376.796875,
-            bottom: 321,
-            left: 366.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 286.796875,
-            y: 161,
-            width: 10,
-            height: 10,
-            top: 161,
-            right: 296.796875,
-            bottom: 171,
-            left: 286.796875,
-            toJSON: () => {},
-          },
-        ],
-      },
-    };
+    check(list, 0, '2', [1, 3]);
+    // connections = new Connections(list);
+    // let actual = connections.getClosestDotsSimplified(list[0], '2');
+    // expect(actual).toEqual([1, 3]);
+    check(list, 1, '1', [1, 3]);
+    // actual = connections.getClosestDotsSimplified(list[1], '1');
+    // expect(actual).toEqual([3, 1]);
 
     list = [
-      {
-        x: 40,
-        y: 40,
-        id: '1',
-        deps: [],
-      },
-      {
-        x: 173.203125,
-        y: -33,
-        id: '2',
-        deps: ['1'],
-      },
+      t({ x: 40, y: 40, id: '1', deps: [] }),
+      t({ x: 173.203125, y: -33, id: '2', deps: ['1'] }),
     ];
-    connections = new Connections(list);
-
-    val = connections.getClosestDotsSimplified(childObj, list[0], '2');
-
-    expect(val).toEqual([1]);
-
-    childObj = {
-      '1': {
-        dots: [
-          {
-            x: 174.796875,
-            y: 110,
-            width: 10,
-            height: 10,
-            top: 110,
-            right: 184.796875,
-            bottom: 120,
-            left: 174.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 244.796875,
-            y: 160,
-            width: 10,
-            height: 10,
-            top: 160,
-            right: 254.796875,
-            bottom: 170,
-            left: 244.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 174.796875,
-            y: 310,
-            width: 10,
-            height: 10,
-            top: 310,
-            right: 184.796875,
-            bottom: 320,
-            left: 174.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 94.796875,
-            y: 160,
-            width: 10,
-            height: 10,
-            top: 160,
-            right: 104.796875,
-            bottom: 170,
-            left: 94.796875,
-            toJSON: () => {},
-          },
-        ],
-      },
-      '2': {
-        dots: [
-          {
-            x: 335.796875,
-            y: 112,
-            width: 10,
-            height: 10,
-            top: 112,
-            right: 345.796875,
-            bottom: 122,
-            left: 335.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 405.796875,
-            y: 162,
-            width: 10,
-            height: 10,
-            top: 162,
-            right: 415.796875,
-            bottom: 172,
-            left: 405.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 335.796875,
-            y: 312,
-            width: 10,
-            height: 10,
-            top: 312,
-            right: 345.796875,
-            bottom: 322,
-            left: 335.796875,
-            toJSON: () => {},
-          },
-          {
-            x: 255.796875,
-            y: 162,
-            width: 10,
-            height: 10,
-            top: 162,
-            right: 265.796875,
-            bottom: 172,
-            left: 255.796875,
-            toJSON: () => {},
-          },
-        ],
-      },
-    };
+    check(list, 0, '2', [1, 3]);
+    // connections = new Connections(list);
+    // actual = connections.getClosestDotsSimplified(list[0], '2');
+    // expect(actual).toEqual([1, 3]);
 
     list = [
-      {
-        x: 40,
-        y: 40,
-        id: '1',
-        deps: [],
-      },
-      {
-        x: 142.203125,
-        y: -33,
-        id: '2',
-        deps: ['1'],
-      },
+      t({ x: 40, y: 40, id: '1', deps: [] }),
+      t({ x: 142.203125, y: -33, id: '2', deps: ['1'] }),
     ];
+    check(list, 0, '2', [1, 3]);
 
-    val = connections.getClosestDotsSimplified(childObj, list[0], '2');
-    expect(val).toEqual([1]);
+    // actual = connections.getClosestDotsSimplified(list[0], '2');
+    // expect(actual).toEqual([1, 3]);
+
+    function check(
+      list: ChildInfo[],
+      index: number,
+      dep: string,
+      expected: [number, number]
+    ) {
+      connections = new Connections(list);
+      const actual = connections.getClosestDotsSimplified(list[index], dep);
+      expect(actual).toEqual(expected);
+    }
   });
 });

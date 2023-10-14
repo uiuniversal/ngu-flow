@@ -18,7 +18,8 @@ import { CommonModule, NgForOf } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { ContainerComponent } from './container.component';
 import { Subject, merge, startWith } from 'rxjs';
-import { Connections } from './connections';
+import { ChildInfo, Connections } from './connections';
+import { Arrangements } from './arrangements';
 
 export interface FlowOptions {
   x: number;
@@ -40,6 +41,8 @@ export class FlowService {
   readonly items = new Map<string, FlowOptions>();
   arrowsChange = new Subject<FlowOptions>();
   deps = new Map<string, string[]>();
+  isDraggingZoomContainer: boolean;
+  isChildDragging: boolean;
   scale = 1;
   panX = 0;
   panY = 0;
@@ -74,66 +77,6 @@ export class FlowService {
         this.deps.set(dep, d);
       });
     });
-    this.connections = new Connections(this.list);
-    const newItems = this.autoArrange();
-    this.items.clear();
-    newItems.forEach((value, key) => {
-      this.items.set(key, value);
-    });
-    this.layoutUpdated.next();
-  }
-
-  public determineLevels(): Map<string, number> {
-    const levels: Map<string, number> = new Map();
-    const processed: Set<string> = new Set();
-
-    const determineNodeLevel = (id: string, lvl: number) => {
-      if (!levels.has(id) || levels.get(id)! < lvl) {
-        levels.set(id, lvl);
-      }
-      processed.add(id);
-
-      const deps = this.connections.reverseDepsMap.get(id) || [];
-      deps.forEach((depId) => {
-        if (!processed.has(depId)) {
-          determineNodeLevel(depId, lvl + 1);
-        }
-      });
-    };
-
-    this.list.forEach((node) => {
-      if (node.deps.length === 0) {
-        determineNodeLevel(node.id, 0);
-      }
-    });
-
-    return levels;
-  }
-
-  public autoArrange(
-    horizontalPadding = 100,
-    verticalPadding = 100
-  ): Map<string, FlowOptions> {
-    const levels = this.determineLevels();
-    const positions: Record<number, number> = {};
-
-    const newItems = new Map<string, FlowOptions>();
-
-    this.list.forEach((node) => {
-      const level = levels.get(node.id)!;
-      if (!(level in positions)) {
-        positions[level] = 0;
-      }
-      const newNode = {
-        ...node,
-        x: positions[level] * horizontalPadding,
-        y: level * verticalPadding,
-      };
-      positions[level] += 1;
-      newItems.set(node.id, newNode);
-    });
-
-    return newItems;
   }
 
   get list() {
@@ -164,11 +107,11 @@ export class FlowService {
         border-radius: 999px;
       }
       .dot-left {
-        top: 45px;
+        top: calc(50% - 5px);
         left: -5px;
       }
       .dot-right {
-        top: 45px;
+        top: calc(50% - 5px);
         right: -5px;
       }
       .dot-top {
@@ -218,9 +161,14 @@ export class FlowChildComponent implements OnInit, OnDestroy {
       this.el.nativeElement.addEventListener('mousedown', this.onMouseDown);
     });
 
-    merge(this.positionChange, this.flow.layoutUpdated).subscribe((x) => {
+    this.flow.layoutUpdated.subscribe((x) => {
+      this.position = this.flow.items.get(this.position.id) as FlowOptions;
+      this.positionChange.next(this.position);
+    });
+
+    this.positionChange.subscribe((x) => {
       const { left, top } = this.flow.zRect;
-      console.log(this.position);
+      // console.log(this.position);
       this.updatePosition(this.position.x + left, this.position.y + top);
     });
   }
@@ -228,11 +176,13 @@ export class FlowChildComponent implements OnInit, OnDestroy {
   private onMouseUp = (event: MouseEvent) => {
     event.stopPropagation();
     this.isDragging = false;
+    this.flow.isChildDragging = false;
   };
 
   private onMouseDown = (event: MouseEvent) => {
     event.stopPropagation();
     this.isDragging = true;
+    this.flow.isChildDragging = true;
     const rect = this.el.nativeElement.getBoundingClientRect();
     this.offsetX = event.clientX - rect.x;
     this.offsetY = event.clientY - rect.y;
@@ -377,7 +327,6 @@ export class FlowComponent
   // New SVG element for guide lines
   @ViewChild('guideLines') guideLines: ElementRef<SVGGElement>;
 
-  isDraggingZoomContainer: boolean;
   initialX = 0;
   initialY = 0;
 
@@ -476,7 +425,7 @@ export class FlowComponent
 
   public _startDraggingZoomContainer = (event: MouseEvent) => {
     event.stopPropagation();
-    this.isDraggingZoomContainer = true;
+    this.flow.isDraggingZoomContainer = true;
     // const containerRect = this.el.nativeElement.getBoundingClientRect();
     this.initialX = event.clientX - this.flow.panX;
     this.initialY = event.clientY - this.flow.panY;
@@ -484,11 +433,11 @@ export class FlowComponent
 
   public _stopDraggingZoomContainer = (event: MouseEvent) => {
     event.stopPropagation();
-    this.isDraggingZoomContainer = false;
+    this.flow.isDraggingZoomContainer = false;
   };
 
   public _dragZoomContainer = (event: MouseEvent) => {
-    if (this.isDraggingZoomContainer) {
+    if (this.flow.isDraggingZoomContainer) {
       event.stopPropagation();
       this.flow.panX = event.clientX - this.initialX;
       this.flow.panY = event.clientY - this.initialY;
@@ -497,9 +446,13 @@ export class FlowComponent
   };
 
   public zoomHandle = (event: WheelEvent) => {
+    if (this.flow.isDraggingZoomContainer || this.flow.isChildDragging) return;
     event.stopPropagation();
     event.preventDefault();
     const scaleDirection = event.deltaY < 0 ? 1 : -1;
+    // if it is zoom out and the scale is less than 0.2, then return
+    if (scaleDirection === -1 && this.flow.scale < 0.2) return;
+
     this.setZoom1(event.clientX, event.clientY, scaleDirection);
   };
 
@@ -554,13 +507,39 @@ export class FlowComponent
       .pipe(startWith(this.children))
       .subscribe((children) => {
         this.flow.update(this.children.map((x) => x.position));
+        this.arrangeChildren();
         this.createArrows();
       });
     setTimeout(() => this.updateArrows()); // this required for angular to render the dot
   }
 
+  arrangeChildren() {
+    this.flow.connections = new Connections(this.list);
+    const arrangements = new Arrangements(
+      this.flow.connections,
+      this.getChildInfo()
+    );
+    console.log('new list', Object.fromEntries(arrangements.newList));
+    this.flow.items.clear();
+    arrangements.newList.forEach((value, key) => {
+      this.flow.items.set(key, value);
+    });
+    this.flow.layoutUpdated.next();
+  }
+
   get list() {
-    return this.children.toArray().map((x) => x.position);
+    return this.children.toArray().map((x) => {
+      // calculate the width and height with scale
+      const elRect = x.el.nativeElement.getBoundingClientRect();
+      const width = elRect.width / this.flow.scale;
+      const height = elRect.height / this.flow.scale;
+      const newElRect = { ...elRect, width, height };
+      return {
+        position: x.position,
+        elRect: newElRect,
+        dots: x.dots.map((y) => y.nativeElement.getBoundingClientRect()),
+      } as ChildInfo;
+    });
   }
 
   createArrows() {
@@ -578,15 +557,15 @@ export class FlowComponent
 
     // Calculate new arrows
     this.list.forEach((item) => {
-      item.deps.forEach((depId) => {
-        const dep = this.list.find((dep) => dep.id === depId);
+      item.position.deps.forEach((depId) => {
+        const dep = this.list.find((dep) => dep.position.id === depId);
         if (dep) {
           const arrow = {
-            d: `M${item.x},${item.y} L${dep.x},${dep.y}`,
-            deps: [item.id, dep.id],
+            d: `M${item.position.x},${item.position.y} L${dep.position.x},${dep.position.y}`,
+            deps: [item.position.id, dep.position.id],
             startDot: 0,
             endDot: 0,
-            id: `arrow${item.id}-to-${dep.id}`,
+            id: `arrow${item.position.id}-to-${dep.position.id}`,
           };
 
           // Create path element and set attributes
@@ -613,12 +592,12 @@ export class FlowComponent
 
   positionChange(position: FlowOptions) {
     // Find the item in the list
-    const item = this.list.find((item) => item.id === position.id);
+    const item = this.list.find((item) => item.position.id === position.id);
 
     // Update item position
     if (!item) return;
-    item.x = position.x;
-    item.y = position.y;
+    item.position.x = position.x;
+    item.position.y = position.y;
 
     // Update arrows
     this.updateArrows();
@@ -628,10 +607,11 @@ export class FlowComponent
     const containerRect = this.el.nativeElement.getBoundingClientRect();
     const gElement: SVGGElement = this.g.nativeElement;
     // Clear existing arrows
-    const childObj = this.children.toArray().reduce((acc, curr) => {
-      acc[curr.position.id] = curr;
-      return acc;
-    }, {} as Record<string, FlowChildComponent>);
+    // const childObj = this.children.toArray().reduce((acc, curr) => {
+    //   acc[curr.position.id] = curr;
+    //   return acc;
+    // }, {} as Record<string, FlowChildComponent>);
+    const childObj = this.getChildInfo();
 
     // Handle reverse dependencies
     // this.closestDots.clear();
@@ -643,23 +623,21 @@ export class FlowComponent
       const [from, to] = arrow.deps;
       const fromItem = childObj[from];
       const toItem = childObj[to];
-      let startDot: FlowOptions = undefined as any;
-      let endDot: FlowOptions = undefined as any;
       if (fromItem && toItem) {
-        const fromClosestDots = this.getClosestDots(
-          childObj,
-          fromItem.position
-        );
-        const toClosestDots = this.getClosestDots(
-          childObj,
-          toItem.position,
-          from
-        );
+        const [endDotIndex, startDotIndex] = this.getClosestDots(toItem, from);
+        // const toClosestDots = this.getClosestDots(
+        //   toItem.position,
+        //   from,
+        //   childObj
+        // );
 
         // Assuming 0 is a default value, replace it with actual logic
-        const startDotIndex = fromClosestDots[0] || 0;
-        const endDotIndex = toClosestDots[0] || 0;
+        // const startDotIndex = fromClosestDots[0] || 0;
+        // const endDotIndex = toClosestDots[0] || 0;
+        // console.log('startDotIndex', startDotIndex, endDotIndex);
 
+        let startDot: FlowOptions = undefined as any;
+        let endDot: FlowOptions = undefined as any;
         startDot = this.getDotByIndex(
           childObj,
           fromItem.position,
@@ -691,11 +669,25 @@ export class FlowComponent
       });
     });
 
-    this.flow.connections.updateDotVisibility(childObj);
+    this.flow.connections.updateDotVisibility(this.oldChildObj());
+  }
+
+  private oldChildObj() {
+    return this.children.toArray().reduce((acc, curr) => {
+      acc[curr.position.id] = curr;
+      return acc;
+    }, {} as Record<string, FlowChildComponent>);
+  }
+
+  private getChildInfo() {
+    return this.list.reduce((acc, curr) => {
+      acc[curr.position.id] = curr;
+      return acc;
+    }, {} as Record<string, ChildInfo>);
   }
 
   private getDotByIndex(
-    childObj: Record<string, FlowChildComponent>,
+    childObj: Record<string, ChildInfo>,
     item: FlowOptions,
     dotIndex: number,
     scale: number,
@@ -703,40 +695,28 @@ export class FlowComponent
     panY: number
   ) {
     const child = childObj[item.id];
-    const childDots = child.dots.toArray();
+    const childDots = child.dots as DOMRect[];
+    // console.log('childDots', childDots, dotIndex, item.id);
 
     // Make sure the dot index is within bounds
     if (dotIndex < 0 || dotIndex >= childDots.length) {
       throw new Error(`Invalid dot index: ${dotIndex}`);
     }
 
-    const dotEl = childDots[dotIndex];
+    const rect = childDots[dotIndex];
     const { left, top } = this.flow.zRect;
-    const rect = dotEl.nativeElement.getBoundingClientRect();
+    // const rect = dotEl.nativeElement.getBoundingClientRect();
     const x = (rect.x + rect.width / 2 - panX - left) / scale;
     const y = (rect.y + rect.height / 2 - panY - top) / scale;
 
     return { ...item, x, y, dotIndex };
   }
 
-  // public getClosestDots(
-  public getClosestDots(
-    childObj: Record<string, FlowChildComponent>,
-    item: FlowOptions,
-    dep?: string
-  ): number[] {
-    const newObj = Object.keys(childObj).reduce((acc, curr) => {
-      acc[curr] = {
-        dots: childObj[curr].dots
-          .toArray()
-          .map((x) => x.nativeElement.getBoundingClientRect()),
-      };
-      return acc;
-    }, {} as Record<string, { dots: DOMRect[] }>);
+  public getClosestDots(item: ChildInfo, dep?: string): number[] {
     return this.flow.connections.getClosestDotsSimplified(
-      newObj,
       item,
       dep as string
+      // newObj
     );
   }
 
@@ -781,7 +761,7 @@ export class FlowComponent
     FlowChildComponent,
   ],
   template: `
-    <button (click)="trigger()">Trigger</button>
+    <button (click)="trigger()">Arrange</button>
     <div class="flex items-center justify-center h-[800px]">
       <app-flow class="max-w-[90%] max-h-[90%] border">
         <div
@@ -803,6 +783,7 @@ export class AppComponent {
   title = 'angular-flow';
   list: FlowOptions[] = [];
   linkingFrom: number | null = null; // Store the index of the node that we start linking from
+  @ViewChild(FlowComponent) flowComponent: FlowComponent;
 
   constructor() {
     // this.list = [
@@ -813,23 +794,7 @@ export class AppComponent {
     //   { x: 860, y: 300, id: '5', deps: ['3'] },
     //   { x: 240, y: 460, id: '6', deps: ['1'] },
     // ];
-    this.list = [
-      { x: 40, y: 40, id: '1', deps: [] },
-      { x: 200, y: 40, id: '2', deps: ['1'] },
-      { x: 360, y: 40, id: '3', deps: ['2'] },
-      { x: 520, y: 40, id: '4', deps: ['2'] },
-      { x: 40, y: 200, id: '5', deps: ['1'] },
-      { x: 200, y: 200, id: '6', deps: ['5'] },
-      { x: 360, y: 200, id: '7', deps: ['5'] },
-      { x: 520, y: 200, id: '8', deps: ['6', '7'] },
-      // { x: 200, y: 360, id: '9', deps: ['6'] },
-      // { x: 360, y: 360, id: '10', deps: ['7'] },
-      // { x: 520, y: 360, id: '11', deps: ['8'] },
-      // { x: 200, y: 520, id: '12', deps: ['9'] },
-      // { x: 360, y: 520, id: '13', deps: ['10'] },
-      // { x: 520, y: 520, id: '14', deps: ['11'] },
-      // { x: 360, y: 680, id: '15', deps: ['12', '13', '14'] },
-    ];
+    this.list = structuredClone(FLOW_LIST);
     // this.list = [
     //   {
     //     x: 40,
@@ -919,5 +884,36 @@ export class AppComponent {
 
   trigger() {
     // Your trigger logic here
+    this.flowComponent.arrangeChildren();
+    this.flowComponent.updateArrows();
   }
 }
+
+export const FLOW_LIST = [
+  { x: 40, y: 40, id: '1', deps: [] },
+  { x: 200, y: 40, id: '2', deps: ['1'] },
+  { x: 360, y: 40, id: '3', deps: ['2'] },
+  { x: 520, y: 40, id: '4', deps: ['2'] },
+  { x: 40, y: 200, id: '5', deps: ['1'] },
+  { x: 200, y: 200, id: '6', deps: ['5'] },
+  { x: 360, y: 200, id: '7', deps: ['5'] },
+  { x: 520, y: 200, id: '8', deps: ['6', '7'] },
+
+  // { x: 40, y: 40, id: '1', deps: [] },
+  // { x: 200, y: 40, id: '2', deps: ['1'] },
+  // { x: 360, y: 40, id: '3', deps: ['1'] },
+  // { x: 520, y: 40, id: '4', deps: ['2'] },
+  // { x: 40, y: 200, id: '5', deps: ['2'] },
+  // { x: 40, y: 200, id: '6', deps: ['2'] },
+
+  // { x: 200, y: 200, id: '6', deps: ['5'] },
+  // { x: 360, y: 200, id: '7', deps: ['5'] },
+  // { x: 520, y: 200, id: '8', deps: ['6', '7'] },
+  // { x: 200, y: 360, id: '9', deps: ['6'] },
+  // { x: 360, y: 360, id: '10', deps: ['7'] },
+  // { x: 520, y: 360, id: '11', deps: ['8'] },
+  // { x: 200, y: 520, id: '12', deps: ['9'] },
+  // { x: 360, y: 520, id: '13', deps: ['10'] },
+  // { x: 520, y: 520, id: '14', deps: ['11'] },
+  // { x: 360, y: 680, id: '15', deps: ['12', '13', '14'] },
+];

@@ -31,7 +31,7 @@ describe('FlowComponent', () => {
     expect(component.flow.panX).toBe(0);
     expect(component.flow.panY).toBe(0);
     component._startDraggingZoomContainer(ev);
-    expect(component.isDraggingZoomContainer).toBeTruthy();
+    expect(component.flow.isDraggingZoomContainer).toBeTruthy();
     expect(component.initialX).toBe(10);
     expect(component.initialY).toBe(10);
   });
@@ -39,7 +39,7 @@ describe('FlowComponent', () => {
   it('should set proper end event', () => {
     const ev = new MouseEvent('mouseup');
     component._stopDraggingZoomContainer(ev);
-    expect(component.isDraggingZoomContainer).toBeFalsy();
+    expect(component.flow.isDraggingZoomContainer).toBeFalsy();
   });
 
   it('should update the transform properly', () => {
@@ -47,7 +47,7 @@ describe('FlowComponent', () => {
       clientX: 11,
       clientY: 11,
     });
-    component.isDraggingZoomContainer = true;
+    component.flow.isDraggingZoomContainer = true;
     component._dragZoomContainer(ev);
     expect(component.zoomContainer.nativeElement.style.transform).toEqual(
       'translate(11px, 11px) scale(1)'
