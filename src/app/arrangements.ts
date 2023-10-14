@@ -32,13 +32,18 @@ export class Arrangements {
       );
 
       for (const baseNode of baseNodes) {
-        const centerY = baseNode.elRect.height / 2;
+        const consumedHeight = this.positionDependents(
+          baseNode,
+          currentX - baseNode.elRect.width - this.horizontalPadding,
+          0,
+          newItems
+        );
+        const centerY = consumedHeight / 2;
         newItems.set(baseNode.position.id, {
           ...baseNode.position,
           x: currentX,
           y: centerY - baseNode.elRect.height / 2,
         });
-        this.positionDependents(baseNode, currentX, centerY, newItems);
         currentX +=
           baseNode.elRect.width + this.horizontalPadding + this.groupPadding;
       }
@@ -77,63 +82,39 @@ export class Arrangements {
     baseX: number,
     baseY: number,
     newItems: Map<string, FlowOptions>
-  ) {
+  ): number {
     const dependents = Object.values(this.list).filter((child) =>
       child.position.deps.includes(baseNode.position.id)
     );
 
-    if (dependents.length === 0) return;
-
-    // Calculate the total height required by all dependents
-    let totalHeight = dependents.reduce(
-      (sum, child) => sum + child.elRect.height,
-      0
-    );
-
-    totalHeight += this.verticalPadding * (dependents.length - 1);
-
-    // Determine the starting Y-coordinate for the first child
-    let startY = baseY - totalHeight / 2;
-
     // Sort children by their original Y-coordinate to preserve order
     dependents.sort((a, b) => a.position.y - b.position.y);
 
-    for (const dependent of dependents) {
-      const newX = baseX + baseNode.elRect.width + this.horizontalPadding;
+    let startY = baseY;
+    let newX = baseX + baseNode.elRect.width + this.horizontalPadding;
+    const height = baseNode.elRect.height;
 
-      // If a child has multiple parents, adjust its Y position to be in the center of those parents
-      if (dependent.position.deps.length > 1) {
-        const parentYs = dependent.position.deps
-          .filter((depId) => newItems.has(depId))
-          .map(
-            (depId) =>
-              newItems.get(depId)!.y + this.list[depId].elRect.height / 2
-          );
-
-        // Calculate the mid-point Y of all parents
-        if (parentYs.length > 0) {
-          const minY = Math.min(...parentYs);
-          const maxY = Math.max(...parentYs);
-          startY = minY + (maxY - minY) / 2 - dependent.elRect.height / 2;
-        }
-      }
-
-      newItems.set(dependent.position.id, {
-        ...dependent.position,
-        x: newX,
-        y: startY,
-      });
-
-      this.positionDependents(
+    for (let i = 0; i < dependents.length; i++) {
+      const dependent = dependents[i];
+      const consumedHeight = this.positionDependents(
         dependent,
         newX,
-        startY + dependent.elRect.height / 2,
+        startY,
         newItems
       );
-
-      // Move to the next position
-      startY += dependent.elRect.height + this.verticalPadding;
+      startY =
+        consumedHeight + (i < dependents.length - 1 ? this.verticalPadding : 0);
     }
+
+    const y =
+      baseY + (dependents.length ? (startY - baseY) / 2 - height / 2 : 0);
+
+    newItems.set(baseNode.position.id, {
+      ...baseNode.position,
+      x: newX,
+      y: y,
+    });
+    return startY + (dependents.length ? 0 : height);
   }
 
   public determineLevels(): Map<string, number> {
