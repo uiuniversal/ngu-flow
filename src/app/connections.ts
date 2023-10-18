@@ -75,12 +75,13 @@ export class Connections {
   ): [number, number] {
     // sides dot index order: [top, right, bottom, left]
     const thresholdDistance = 10; // Example distance threshold. Adjust as needed.
-
+    let swapped = false;
     // correct the parent based on the deps
     if (!child.position.deps.includes(parent.position.id)) {
       const _t = child;
       child = parent;
       parent = _t;
+      swapped = true;
     }
 
     const childDirection: 'right' | 'left' | 'bottom' | 'top' = (() => {
@@ -116,7 +117,7 @@ export class Connections {
     //   [structuredClone(parent), structuredClone(child)]
     // );
 
-    return [parentIndex, childIndex];
+    return swapped ? [childIndex, parentIndex] : [parentIndex, childIndex];
   }
 
   updateDotVisibility(childObj: Record<string, FlowChildComponent>) {

@@ -2,34 +2,24 @@ import { FlowOptions } from './app.component';
 import { ChildInfo, Connections } from './connections';
 
 export class Arrangements {
-  newList = new Map<string, FlowOptions>();
-
   direction: 'horizontal' | 'vertical' = 'horizontal';
   horizontalPadding = 100;
-  verticalPadding = 100;
-  groupPadding = 0;
+  verticalPadding = 20;
+  groupPadding = 100;
 
-  constructor(
-    private connections: Connections,
-    private list: Record<string, ChildInfo>
-  ) {
-    // console.count('Arrangements');
-    const values = structuredClone(Object.values(list).map((x) => x.position));
-    this.newList = this.autoArrange();
-    // console.log('list', values);
-    // console.log('newList values', structuredClone(Object.values(this.newList)));
-  }
+  constructor(private list: ChildInfo[]) {}
 
   public autoArrange(): Map<string, FlowOptions> {
-    const levels = this.determineLevels();
     const newItems = new Map<string, FlowOptions>();
     let currentX = 0;
 
     if (this.direction === 'horizontal') {
       // Start by positioning the base nodes
-      const baseNodes = Object.values(this.list).filter(
+      const baseNodes = this.list.filter(
         (node) => node.position.deps.length === 0
       );
+
+      let level = 0;
 
       for (const baseNode of baseNodes) {
         const consumedHeight = this.positionDependents(
@@ -38,12 +28,12 @@ export class Arrangements {
           0,
           newItems
         );
-        const centerY = consumedHeight / 2;
-        newItems.set(baseNode.position.id, {
-          ...baseNode.position,
-          x: currentX,
-          y: centerY - baseNode.elRect.height / 2,
-        });
+        // const centerY = consumedHeight / 2;
+        // newItems.set(baseNode.position.id, {
+        //   ...baseNode.position,
+        //   x: currentX,
+        //   y: centerY - baseNode.elRect.height / 2,
+        // });
         currentX +=
           baseNode.elRect.width + this.horizontalPadding + this.groupPadding;
       }
@@ -81,9 +71,10 @@ export class Arrangements {
     baseNode: ChildInfo,
     baseX: number,
     baseY: number,
-    newItems: Map<string, FlowOptions>
-  ): number {
-    const dependents = Object.values(this.list).filter((child) =>
+    newItems: Map<string, FlowOptions>,
+    isLast = false
+  ): { consumedHeight: number } {
+    const dependents = this.list.filter((child) =>
       child.position.deps.includes(baseNode.position.id)
     );
 
@@ -95,15 +86,16 @@ export class Arrangements {
     const height = baseNode.elRect.height;
 
     for (let i = 0; i < dependents.length; i++) {
+      const depLast = i === dependents.length - 1;
       const dependent = dependents[i];
-      const consumedHeight = this.positionDependents(
+      const { consumedHeight } = this.positionDependents(
         dependent,
         newX,
         startY,
-        newItems
+        newItems,
+        depLast
       );
-      startY =
-        consumedHeight + (i < dependents.length - 1 ? this.verticalPadding : 0);
+      startY = consumedHeight + (!depLast ? this.verticalPadding : 0);
     }
 
     const y =
@@ -114,32 +106,10 @@ export class Arrangements {
       x: newX,
       y: y,
     });
-    return startY + (dependents.length ? 0 : height);
-  }
-
-  public determineLevels(): Map<string, number> {
-    const levels: Map<string, number> = new Map();
-    const processed: Set<string> = new Set();
-
-    const determineNodeLevel = (id: string, lvl: number) => {
-      if (!levels.has(id) || levels.get(id)! < lvl) {
-        levels.set(id, lvl);
-      }
-      processed.add(id);
-
-      const deps = this.connections.reverseDepsMap.get(id) || [];
-      deps.forEach((depId) => {
-        if (!processed.has(depId)) {
-          determineNodeLevel(depId, lvl + 1);
-        }
-      });
-    };
-
-    for (const [id, node] of Object.entries(this.list)) {
-      if (node.position.deps.length === 0) {
-        determineNodeLevel(id, 0);
-      }
+    if (!isLast && dependents.length > 1) {
+      startY += this.groupPadding;
     }
-    return levels;
+    const consumedHeight = startY + (dependents.length ? 0 : height);
+    return { consumedHeight };
   }
 }

@@ -514,14 +514,12 @@ export class FlowComponent
   }
 
   arrangeChildren() {
-    this.flow.connections = new Connections(this.list);
-    const arrangements = new Arrangements(
-      this.flow.connections,
-      this.getChildInfo()
-    );
-    console.log('new list', Object.fromEntries(arrangements.newList));
+    // this.flow.connections = new Connections(this.list);
+    const arrangements = new Arrangements(this.list);
+    const newList = arrangements.autoArrange();
+    console.log('new list', Object.fromEntries(newList));
     this.flow.items.clear();
-    arrangements.newList.forEach((value, key) => {
+    newList.forEach((value, key) => {
       this.flow.items.set(key, value);
     });
     this.flow.layoutUpdated.next();

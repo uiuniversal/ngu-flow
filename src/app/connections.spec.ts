@@ -15,7 +15,7 @@ describe('Connections', () => {
     ];
 
     check(list, [1, 3]);
-    check(list.reverse(), [1, 3]);
+    check(list.reverse(), [3, 1]);
 
     list = [
       t({ x: 300, y: -150, id: '2', deps: ['1'] }),
@@ -27,7 +27,7 @@ describe('Connections', () => {
       t({ x: 46, y: -470, id: '3', deps: ['2'] }),
       t({ x: 300, y: -150, id: '2', deps: ['1'] }),
     ];
-    check(list, [3, 1]);
+    check(list, [1, 3]);
 
     list = [
       t({ x: 300, y: -150, id: '2', deps: ['1'] }),
@@ -52,7 +52,7 @@ describe('Connections', () => {
     // connections = new Connections(list);
     // let actual = connections.getClosestDotsSimplified(list[0], '2');
     // expect(actual).toEqual([1, 3]);
-    check(list, 1, '1', [1, 3]);
+    check(list, 1, '1', [3, 1]);
     // actual = connections.getClosestDotsSimplified(list[1], '1');
     // expect(actual).toEqual([3, 1]);
 
