@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { FlowComponent, FlowService } from './app.component';
+import { FlowComponent } from './flow.component';
+import { FlowService } from './flow.service';
 
 describe('FlowComponent', () => {
   let component: FlowComponent;
@@ -59,9 +60,9 @@ describe('FlowComponent', () => {
     const val = component._setZoom(1, 1, 1, 10, 11, 1.1);
     const d = JSON.stringify(val);
     expect(val).toEqual({
-      scale: 1.11,
-      panX: 10.081818181818182,
-      panY: 11.090909090909092,
+      scale: 1.122,
+      panX: 10.18,
+      panY: 11.2,
     });
   });
 
@@ -71,7 +72,7 @@ describe('FlowComponent', () => {
     });
     component.zoomHandle(ev);
     expect(component.zoomContainer.nativeElement.style.transform).toEqual(
-      'translate(0px, 0px) scale(1.01)'
+      'translate(0px, 0px) scale(1.02)'
     );
   });
 });

@@ -1,4 +1,5 @@
-import { FlowChildComponent, FlowOptions } from './app.component';
+import { FlowOptions } from './flow-interface';
+import { FlowChildComponent } from './flow-child.component';
 
 export class Connections {
   // key = id of the item
@@ -135,6 +136,7 @@ export class Connections {
         dot.nativeElement.style.visibility = isClosestForAnyDep
           ? 'visible'
           : 'hidden';
+        // dot.nativeElement.style.visibility = 'hidden';
       });
     });
   }

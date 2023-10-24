@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { FlowChildComponent, FlowService } from './app.component';
+import { FlowChildComponent } from './flow-child.component';
+import { FlowService } from './flow.service';
 
 describe('FlowChildComponent', () => {
   let component: FlowChildComponent;

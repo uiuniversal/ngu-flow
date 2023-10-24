@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { FlowOptions, FlowService } from './app.component';
+import { FlowService } from './flow.service';
+import { FlowOptions } from './flow-interface';
 
 describe('FlowService', () => {
   let service: FlowService;

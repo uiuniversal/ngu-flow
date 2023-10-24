@@ -1,4 +1,4 @@
-import { FlowOptions } from './app.component';
+import { FlowOptions } from './flow-interface';
 import { ChildInfo, Connections } from './connections';
 
 describe('Connections', () => {
