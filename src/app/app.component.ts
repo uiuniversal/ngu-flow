@@ -1,22 +1,14 @@
 import { Component, ViewChild, inject } from '@angular/core';
 import { NgForOf } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
-import { ContainerComponent } from './container.component';
-import { FlowChildComponent } from './flow-child.component';
-import { FlowComponent } from './flow.component';
-import { FlowOptions } from './flow-interface';
-import { FlowService } from './flow.service';
+import { FlowChildComponent } from './flow/flow-child.component';
+import { FlowComponent } from './flow/flow.component';
+import { FlowOptions } from './flow/flow-interface';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [
-    NgForOf,
-    RouterOutlet,
-    FlowComponent,
-    ContainerComponent,
-    FlowChildComponent,
-  ],
+  imports: [NgForOf, RouterOutlet, FlowComponent, FlowChildComponent],
   template: `
     <button (click)="trigger()">Arrange</button>
 
@@ -54,7 +46,36 @@ import { FlowService } from './flow.service';
       </app-flow>
     </div>
   `,
-  styleUrls: ['./app.component.scss'],
+  styles: [
+    `
+      .card {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 180px;
+        height: 40px;
+        box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.3);
+        border-radius: 5px;
+        background-color: white;
+      }
+
+      .doting {
+        --scale: 2;
+        left: 318px;
+        top: 263px;
+        width: calc(5px + (5px * var(--scale)));
+        height: calc(5px + (5px * var(--scale)));
+        position: fixed;
+        background: blue;
+        z-index: 124;
+        pointer-events: none;
+      }
+
+      button {
+        @apply p-1;
+      }
+    `,
+  ],
 })
 export class AppComponent {
   title = 'angular-flow';

@@ -3,5 +3,9 @@
   "typescript.referencesCodeLens.enabled": true,
   "typescript.implementationsCodeLens.enabled": true,
   "javascript.inlayHints.parameterTypes.enabled": true,
-  "javascript.inlayHints.variableTypes.enabled": true
+  "javascript.inlayHints.variableTypes.enabled": true,
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.ts": "${basename}.spec.ts,${basename}.ts"
+  }
 }
