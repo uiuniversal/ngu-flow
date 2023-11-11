@@ -28,6 +28,7 @@ import { FlowOptions } from './flow/flow-interface';
         (click)="childDraggingFn()"
       />Child Dragging
     </label>
+    <button (click)="fitToWindow()">Fit to window</button>
     <div class="flex items-center justify-center h-[700px]">
       <app-flow class="max-w-[90%] max-h-[90%] border">
         <div
@@ -52,8 +53,8 @@ import { FlowOptions } from './flow/flow-interface';
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 180px;
-        height: 40px;
+        width: 400px;
+        height: 395px;
         box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.3);
         border-radius: 5px;
         background-color: white;
@@ -94,7 +95,13 @@ export class AppComponent {
     //   { x: 860, y: 300, id: '5', deps: ['3'] },
     //   { x: 240, y: 460, id: '6', deps: ['1'] },
     // ];
-    this.list = structuredClone(FLOW_LIST);
+    // this.list = structuredClone(FLOW_LIST);
+    this.list = [
+      { x: 300, y: -400, id: '1', deps: [] },
+      { x: 300, y: -400, id: '2', deps: ['1'] },
+      { x: 300, y: -400, id: '3', deps: ['2'] },
+      { x: 300, y: -200, id: '4', deps: ['2'] },
+    ];
     // this.list = [
     //   {
     //     x: 40,
@@ -192,6 +199,10 @@ export class AppComponent {
       }
       this.linkingFrom = null;
     }
+  }
+
+  fitToWindow() {
+    this.flowComponent.fitToWindow();
   }
 
   trigger() {

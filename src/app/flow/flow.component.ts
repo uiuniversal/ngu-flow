@@ -17,6 +17,7 @@ import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
 import { FlowOptions } from './flow-interface';
 import { SvgHandler } from './svg';
+import { FitToWindow } from './fit-to-window';
 
 @Component({
   standalone: true,
@@ -227,6 +228,7 @@ export class FlowComponent
 
   public _dragZoomContainer = (event: MouseEvent) => {
     if (this.flow.isDraggingZoomContainer) {
+      event.preventDefault();
       event.stopPropagation();
       this.flow.panX = event.clientX - this.initialX;
       this.flow.panY = event.clientY - this.initialY;
@@ -287,6 +289,82 @@ export class FlowComponent
     return { scale: newScale, panX: newPanX, panY: newPanY };
   }
 
+  fitToWindow() {
+    const ftw = new FitToWindow(
+      this.list,
+      this.zoomContainer.nativeElement.getBoundingClientRect(),
+      this.flow.scale,
+      this.flow.panX,
+      this.flow.panY
+    );
+    const { scale, panX, panY } = ftw.fitToWindow();
+    this.flow.scale = scale;
+    this.flow.panX = panX;
+    this.flow.panY = panY;
+    this.updateZoomContainer();
+  }
+
+  // fitToWindow() {
+  //   // The amount of padding to leave around the edges of the container and it should be scale independent
+  //   const containerPadding = 30 / this.flow.scale;
+  //   // Step 1: Get the positions of all nodes and dimensions of the container
+  //   const positions = this.list.map((child) => {
+  //     const scaledX = child.elRect.x / this.flow.scale - this.flow.panX;
+  //     const scaledY = child.elRect.y / this.flow.scale - this.flow.panY;
+  //     const scaledWidth = child.elRect.width;
+  //     const scaledHeight = child.elRect.height;
+  //     return {
+  //       x: scaledX,
+  //       y: scaledY,
+  //       width: scaledWidth,
+  //       height: scaledHeight,
+  //     };
+  //   });
+  //   const containerRect =
+  //     this.zoomContainer.nativeElement.getBoundingClientRect();
+
+  //   // Step 2: Calculate the boundaries (min and max coordinates) of the nodes
+  //   const minX = Math.min(...positions.map((p) => p.x));
+  //   const maxX = Math.max(...positions.map((p) => p.x + p.width));
+  //   const minY = Math.min(...positions.map((p) => p.y));
+  //   const maxY = Math.max(...positions.map((p) => p.y + p.height));
+
+  //   // Step 3: Determine the scaling factor to fit nodes within the container
+  //   const adjMaxX = maxX - minX + containerPadding;
+  //   const adjMaxY = maxY - minY + containerPadding;
+
+  //   // find the actual width and height of the container after scale
+  //   const cRect = {
+  //     x: containerRect.x / this.flow.scale - this.flow.panX,
+  //     y: containerRect.y / this.flow.scale - this.flow.panY,
+  //     width: containerRect.width / this.flow.scale,
+  //     height: containerRect.height / this.flow.scale,
+  //   };
+
+  //   const scaleX = cRect.width / adjMaxX;
+  //   const scaleY = cRect.height / adjMaxY;
+  //   const newScale = Math.min(scaleX, scaleY);
+
+  //   // Step 4: Determine the panning values to center the content within the container
+  //   // These are now calculated relative to the unscaled positions
+  //   const panX =
+  //     cRect.x +
+  //     (cRect.width - (adjMaxX - containerPadding) * newScale) / 2 -
+  //     minX * newScale;
+  //   const panY =
+  //     cRect.y +
+  //     (cRect.height - (adjMaxY - containerPadding) * newScale) / 2 -
+  //     minY * newScale;
+
+  //   // Apply the calculated scale and pan values
+  //   this.flow.scale = newScale;
+  //   this.flow.panX = panX;
+  //   this.flow.panY = panY;
+
+  //   // Update the zoomContainer's transform property to apply the new scale and pan
+  //   this.updateZoomContainer();
+  // }
+
   private updateZoomContainer() {
     this.zoomContainer.nativeElement.style.transform = `translate(${this.flow.panX}px, ${this.flow.panY}px) scale(${this.flow.scale})`;
   }
@@ -316,7 +394,16 @@ export class FlowComponent
       const elRect = x.el.nativeElement.getBoundingClientRect();
       const width = elRect.width / this.flow.scale;
       const height = elRect.height / this.flow.scale;
-      const newElRect = { ...elRect, width, height };
+      const newElRect = {
+        x: elRect.x,
+        y: elRect.y,
+        bottom: elRect.bottom,
+        left: elRect.left,
+        right: elRect.right,
+        top: elRect.top,
+        width,
+        height,
+      };
       return {
         position: x.position,
         elRect: newElRect,
