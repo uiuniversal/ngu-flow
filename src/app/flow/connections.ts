@@ -10,7 +10,10 @@ export class Connections {
   // value = index of the closest dot
   closestDots = new Map<string, number>();
 
-  constructor(private list: ChildInfo[]) {
+  constructor(
+    private list: ChildInfo[],
+    private direction: 'horizontal' | 'vertical' = 'horizontal'
+  ) {
     this.setReverseDepsMap(list.map((x) => x.position));
     // console.count('Connections');
   }
@@ -77,6 +80,7 @@ export class Connections {
     // sides dot index order: [top, right, bottom, left]
     const thresholdDistance = 10; // Example distance threshold. Adjust as needed.
     let swapped = false;
+    const isV = this.direction === 'vertical';
     // correct the parent based on the deps
     if (!child.position.deps.includes(parent.position.id)) {
       const _t = child;
@@ -91,10 +95,17 @@ export class Connections {
       const { x, y } = child.position;
       const { x: px, y: py } = parent.position;
 
-      if (x + width < px) return 'left';
-      if (x - width > px) return 'right';
-      if (y + height < py) return 'top';
-      if (y - height > py) return 'bottom';
+      if (!isV) {
+        if (x + width < px) return 'left';
+        if (x - width > px) return 'right';
+        if (y + height < py) return 'top';
+        if (y - height > py) return 'bottom';
+      } else {
+        if (y + height < py) return 'top';
+        if (y - height > py) return 'bottom';
+        if (x + width < px) return 'left';
+        if (x - width > px) return 'right';
+      }
       return 'right';
     })();
 

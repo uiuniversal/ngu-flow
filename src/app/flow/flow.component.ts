@@ -24,85 +24,49 @@ import { FitToWindow } from './fit-to-window';
   imports: [NgForOf, FlowChildComponent],
   providers: [FlowService],
   selector: 'app-flow',
-  template: ` <!-- <svg class="flow-pattern">
-      <pattern
-        id="pattern-1undefined"
-        x="7.085546445278233"
-        y="-1.3184974288563538"
-        width="16.772199608271144"
-        height="16.772199608271144"
-        patternUnits="userSpaceOnUse"
-        patternTransform="translate(-0.5241312377584733,-0.5241312377584733)"
-      >
-        <circle
-          cx="0.5241312377584733"
-          cy="0.5241312377584733"
-          r="0.5241312377584733"
-          fill="#aaa"
-        ></circle>
-      </pattern>
-      <rect
-        x="0"
-        y="0"
-        width="100%"
-        height="100%"
-        fill="url(#pattern-1undefined)"
-      ></rect>
-    </svg> -->
-    <div class="zoom-container" #zoomContainer>
-      <svg #svg>
-        <!-- <defs>
-          <marker
-            id="arrowhead"
-            viewBox="-10 -10 20 20"
-            refX="0"
-            refY="0"
-            orient="auto"
-          >
-            <polygon points="-6.75,-6.75 0,0 -6.75,6.75"></polygon>
-          </marker>
-        </defs> -->
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="0"
-            refY="3.5"
-            orient="auto"
-          >
-            <polygon fill="blue" points="0 0, 10 3.5, 0 7"></polygon>
-          </marker>
-        </defs>
-        <g #g></g>
-        <!-- <g #guideLines></g> -->
+  template: ` <div class="zoom-container" #zoomContainer>
+    <svg #svg>
+      <defs>
+        <marker
+          id="arrowhead"
+          markerWidth="10"
+          markerHeight="7"
+          refX="0"
+          refY="3.5"
+          orient="auto"
+        >
+          <polygon fill="blue" points="0 0, 10 3.5, 0 7"></polygon>
+        </marker>
+      </defs>
+      <g #g></g>
+      <!-- <g #guideLines></g> -->
 
-        <!-- <text font-size="20" writing-mode="tb" text-anchor="middle">
+      <!-- <text font-size="20" writing-mode="tb" text-anchor="middle">
           <textPath xlink:href="#arrow2-to-1" startOffset="50%">
             Follow me
           </textPath>
         </text> -->
-        <text font-size="20" dy="20" dx="10">
-          <textPath
-            xlink:href="#arrow2-to-1"
-            startOffset="50%"
-            side="left"
-            text-anchor="middle"
-          >
-            Follow me
-          </textPath>
-          <textPath
-            xlink:href="#arrow6-to-1"
-            startOffset="50%"
-            side="left"
-            text-anchor="middle"
-          >
-            Follow me
-          </textPath>
-        </text>
-      </svg>
-      <ng-content></ng-content>
-    </div>`,
+      <text font-size="20" dy="20" dx="10">
+        <textPath
+          xlink:href="#arrow2-to-1"
+          startOffset="50%"
+          side="left"
+          text-anchor="middle"
+        >
+          Follow me
+        </textPath>
+        <textPath
+          xlink:href="#arrow6-to-1"
+          startOffset="50%"
+          side="left"
+          text-anchor="middle"
+        >
+          Follow me
+        </textPath>
+      </text>
+    </svg>
+    <ng-content></ng-content>
+  </div>`,
   styles: [
     `
       :host {
@@ -242,7 +206,7 @@ export class FlowComponent
     event.preventDefault();
     const scaleDirection = event.deltaY < 0 ? 1 : -1;
     // if it is zoom out and the scale is less than 0.2, then return
-    if (scaleDirection === -1 && this.flow.scale < 0.2) return;
+    if (scaleDirection === -1 && this.flow.scale < 0.1) return;
 
     this.setZoom1(event.clientX, event.clientY, scaleDirection);
   };
@@ -486,7 +450,7 @@ export class FlowComponent
     // Handle reverse dependencies
     // this.closestDots.clear();
     // this.reverseDepsMap.clear();
-    this.flow.connections = new Connections(this.list);
+    this.flow.connections = new Connections(this.list, this.flow.direction);
 
     // Calculate new arrows
     this.flow.arrows.forEach((arrow) => {
@@ -506,9 +470,7 @@ export class FlowComponent
         // const endDotIndex = toClosestDots[0] || 0;
         // console.log('startDotIndex', startDotIndex, endDotIndex);
 
-        let startDot: FlowOptions = undefined as any;
-        let endDot: FlowOptions = undefined as any;
-        startDot = this.getDotByIndex(
+        const startDot = this.getDotByIndex(
           childObj,
           fromItem.position,
           startDotIndex,
@@ -516,7 +478,7 @@ export class FlowComponent
           this.flow.panX,
           this.flow.panY
         );
-        endDot = this.getDotByIndex(
+        const endDot = this.getDotByIndex(
           childObj,
           toItem.position,
           endDotIndex,
@@ -564,7 +526,7 @@ export class FlowComponent
     scale: number,
     panX: number,
     panY: number
-  ) {
+  ): DotOptions {
     const child = childObj[item.id];
     const childDots = child.dots as DOMRect[];
     // console.log('childDots', childDots, dotIndex, item.id);
@@ -594,4 +556,15 @@ export class FlowComponent
   ngOnDestroy(): void {
     this.el.nativeElement.removeEventListener('wheel', this.zoomHandle);
   }
+}
+
+export interface DotOptions extends FlowOptions {
+  /**
+   * The index of the dot
+   * top = 0
+   * right = 1
+   * bottom = 2
+   * left = 3
+   */
+  dotIndex: number;
 }

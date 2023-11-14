@@ -1,7 +1,13 @@
 import { FlowOptions } from './flow-interface';
+import { DotOptions } from './flow.component';
 
 export class SvgHandler {
   arrowSize = 20;
+
+  // 'controlPointDistance' is a new property to be defined. It determines how 'curvy' the path should be.
+  // Adjust this value to increase or decrease the curvature of the Bezier path.
+  controlPointDistance = 50; // Example value, adjust as needed
+
   bezierPath(start: FlowOptions, end: FlowOptions) {
     let { x: startX, y: startY } = start;
     const dx = end.x - start.x;
@@ -50,7 +56,7 @@ export class SvgHandler {
     return `M${start.x} ${start.y} L${midX} ${start.y} L${midX} ${end.y} L${end.x} ${end.y}`;
   }
 
-  blendCorners(start: FlowOptions, end: FlowOptions): string {
+  blendCorners1(start: FlowOptions, end: FlowOptions): string {
     // include the arrow size
     let { x: startX, y: startY } = start;
     let { x: endX, y: endY } = end;
@@ -61,5 +67,72 @@ export class SvgHandler {
 
     // Create the path using the cubic Bezier curve
     return `M${startX} ${startY} C${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${endX} ${endY}`;
+  }
+
+  blendCorners(start: DotOptions, end: DotOptions): string {
+    let { x: startX, y: startY, dotIndex: startDotIndex } = start;
+    let { x: endX, y: endY, dotIndex: endDotIndex } = end;
+
+    // Determine the direction from the dotIndex and adjust the start and end points
+    let startAdjustment = this.getDirectionAdjustment(startDotIndex);
+    let endAdjustment = this.getDirectionAdjustment(endDotIndex);
+
+    startX += startAdjustment.x;
+    startY += startAdjustment.y;
+    endX += endAdjustment.x;
+    endY += endAdjustment.y;
+
+    // Calculate control points based on the directionality
+    let cp1 = {
+      x: startX + startAdjustment.cpX,
+      y: startY + startAdjustment.cpY,
+    };
+    let cp2 = { x: endX + endAdjustment.cpX, y: endY + endAdjustment.cpY };
+
+    // Create the path using the cubic Bezier curve
+    const path = `M${startX - startAdjustment.x} ${
+      startY - startAdjustment.y
+    } C${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${endX} ${endY}`;
+    return path;
+  }
+
+  getDirectionAdjustment(dotIndex: number): {
+    x: number;
+    y: number;
+    cpX: number;
+    cpY: number;
+  } {
+    switch (dotIndex) {
+      case 0: // top
+        return {
+          x: 0,
+          y: -this.arrowSize,
+          cpX: 0,
+          cpY: -this.controlPointDistance,
+        };
+      case 1: // right
+        return {
+          x: this.arrowSize,
+          y: 0,
+          cpX: this.controlPointDistance,
+          cpY: 0,
+        };
+      case 2: // bottom
+        return {
+          x: 0,
+          y: this.arrowSize,
+          cpX: 0,
+          cpY: this.controlPointDistance,
+        };
+      case 3: // left
+        return {
+          x: -this.arrowSize,
+          y: 0,
+          cpX: -this.controlPointDistance,
+          cpY: 0,
+        };
+      default:
+        return { x: 0, y: 0, cpX: 0, cpY: 0 };
+    }
   }
 }

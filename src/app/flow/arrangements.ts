@@ -13,55 +13,22 @@ export class Arrangements {
   public autoArrange(): Map<string, FlowOptions> {
     const newItems = new Map<string, FlowOptions>();
     let currentX = 0;
+    let currentY = 0;
 
-    if (this.direction === 'horizontal') {
-      // Start by positioning the base nodes
-      const baseNodes = this.list.filter(
-        (node) => node.position.deps.length === 0
-      );
+    // Handle both horizontal and vertical directions
+    const baseNodes = this.list.filter(
+      (node) => node.position.deps.length === 0
+    );
 
-      let level = 0;
-
-      for (const baseNode of baseNodes) {
-        const consumedHeight = this.positionDependents(
-          baseNode,
-          0,
-          0,
-          newItems
-        );
-        // const centerY = consumedHeight / 2;
-        // newItems.set(baseNode.position.id, {
-        //   ...baseNode.position,
-        //   x: currentX,
-        //   y: centerY - baseNode.elRect.height / 2,
-        // });
+    for (const baseNode of baseNodes) {
+      if (this.direction === 'horizontal') {
+        this.positionDependents(baseNode, currentX, 0, newItems);
         currentX += baseNode.elRect.width + this.horizontalPadding;
+      } else {
+        // Vertical arrangement
+        this.positionDependents(baseNode, 0, currentY, newItems);
+        currentY += baseNode.elRect.height + this.horizontalPadding;
       }
-    } else {
-      // direction === 'vertical'
-      // let currentY = 0;
-      // for (const level in levelsMap) {
-      //   const itemsInLevel = levelsMap[level];
-      //   let currentX = 0;
-      //   // Sort items within the level by their current x position
-      //   itemsInLevel.sort((a, b) => a.position.x - b.position.x);
-      //   for (const node of itemsInLevel) {
-      //     const newNode: FlowOptions = {
-      //       ...node.position,
-      //       x: currentX,
-      //       y: currentY,
-      //     };
-      //     currentX += node.elRect.width + this.horizontalPadding;
-      //     newItems.set(node.position.id, newNode);
-      //   }
-      //   const maxHeightItem = itemsInLevel.reduce((max, item) => {
-      //     return item.elRect.height > max.elRect.height ? item : max;
-      //   }, itemsInLevel[0]);
-      //   currentY +=
-      //     maxHeightItem.elRect.height +
-      //     this.verticalPadding +
-      //     this.groupPadding;
-      // }
     }
 
     return newItems;
@@ -77,14 +44,17 @@ export class Arrangements {
       gp: -this.groupPadding * 2,
       maxDepLength: 0,
     }
-  ): { consumedHeight: number; dep: boolean } {
+  ): { consumedSpace: number; dep: boolean } {
     const dependents = this.list.filter((child) =>
       child.position.deps.includes(baseNode.position.id)
     );
 
+    const isV = this.direction === 'vertical';
+
     let startY = baseY;
-    let newX = baseX + baseNode.elRect.width + this.horizontalPadding;
-    const height = baseNode.elRect.height;
+    const { width: w, height: h } = baseNode.elRect;
+    let newX = baseX + (isV ? h : w) + this.horizontalPadding;
+    const height = isV ? w : h;
 
     const childC: { first: boolean; gp: number; maxDepLength: number } = {
       first: true,
@@ -95,7 +65,7 @@ export class Arrangements {
       const depLast = i === dependents.length - 1;
       childC.first = i === 0;
       const dependent = dependents[i];
-      const { consumedHeight, dep } = this.positionDependents(
+      const { consumedSpace, dep } = this.positionDependents(
         dependent,
         newX,
         startY,
@@ -109,7 +79,7 @@ export class Arrangements {
         startY += this.groupPadding;
         config.gp += this.groupPadding;
       }
-      startY += consumedHeight + (!depLast ? this.verticalPadding : 0);
+      startY += consumedSpace + (!depLast ? this.verticalPadding : 0);
     }
 
     // baseY += childC.gp;
@@ -118,12 +88,12 @@ export class Arrangements {
     let y = 0;
     if (dependents.length > 1) {
       // find the first and last dependent and there y position
-      const firstDep = dependents[0];
-      const lastDep = dependents[dependents.length - 1];
-      const firstDepY = newItems.get(firstDep.position.id)!.y;
-      const lastDepY = newItems.get(lastDep.position.id)!.y;
+      const firstDepId = dependents[0].position.id;
+      const lastDepId = dependents[dependents.length - 1].position.id;
+      const firstDep = newItems.get(firstDepId)!;
+      const lastDep = newItems.get(lastDepId)!;
       // find the center of the first and last dependent
-      y = (firstDepY + lastDepY) / 2;
+      y = (isV ? firstDep.x + lastDep.x : firstDep.y + lastDep.y) / 2;
     } else {
       y = baseY + (dependents.length ? (startY - baseY) / 2 - height / 2 : 0);
 
@@ -136,13 +106,13 @@ export class Arrangements {
     }
     newItems.set(baseNode.position.id, {
       ...baseNode.position,
-      x: baseX,
-      y: y,
+      x: isV ? y : baseX,
+      y: isV ? baseX : y,
     });
     // add groupPadding if there are more than one dependency
     const groupPad =
       dependents.length > 1 ? this.groupPadding - this.verticalPadding : 0;
-    const consumedHeight = startY + (dependents.length ? 0 : height) + groupPad;
-    return { consumedHeight, dep: dependents.length > 0 };
+    const consumedSpace = startY + (dependents.length ? 0 : height) + groupPad;
+    return { consumedSpace, dep: dependents.length > 0 };
   }
 }

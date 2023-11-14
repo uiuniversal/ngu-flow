@@ -1,6 +1,7 @@
 import { Component, ViewChild, inject } from '@angular/core';
 import { NgForOf } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { FlowChildComponent } from './flow/flow-child.component';
 import { FlowComponent } from './flow/flow.component';
 import { FlowOptions } from './flow/flow-interface';
@@ -8,27 +9,53 @@ import { FlowOptions } from './flow/flow-interface';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [NgForOf, RouterOutlet, FlowComponent, FlowChildComponent],
+  imports: [
+    NgForOf,
+    RouterOutlet,
+    ReactiveFormsModule,
+    FlowComponent,
+    FlowChildComponent,
+  ],
   template: `
-    <button (click)="trigger()">Arrange</button>
+    <div class="flex items-center gap-3">
+      <button (click)="trigger()">Arrange</button>
+      <label for="zoomingId">
+        <input
+          id="zoomingId"
+          type="checkbox"
+          [checked]="zooming"
+          (click)="zoomingFn()"
+        />zooming
+      </label>
+      <label for="childDraggingId">
+        <input
+          id="childDraggingId"
+          type="checkbox"
+          [checked]="childDragging"
+          (click)="childDraggingFn()"
+        />Child Dragging
+      </label>
+      <button (click)="fitToWindow()">Fit to window</button>
 
-    <label for="zoomingId">
-      <input
-        id="zoomingId"
-        type="checkbox"
-        [checked]="zooming"
-        (click)="zoomingFn()"
-      />zooming
-    </label>
-    <label for="childDraggingId">
-      <input
-        id="childDraggingId"
-        type="checkbox"
-        [checked]="childDragging"
-        (click)="childDraggingFn()"
-      />Child Dragging
-    </label>
-    <button (click)="fitToWindow()">Fit to window</button>
+      <!-- radio group for horizontal or vertical -->
+      <label for="direction">
+        <input
+          id="direction"
+          type="radio"
+          [value]="'horizontal'"
+          [formControl]="direction"
+        />Horizontal
+      </label>
+      <label for="direction1">
+        <input
+          id="direction1"
+          type="radio"
+          [value]="'vertical'"
+          [formControl]="direction"
+        />Vertical
+      </label>
+    </div>
+
     <div class="flex items-center justify-center h-[700px]">
       <app-flow class="max-w-[90%] max-h-[90%] border">
         <div
@@ -83,6 +110,7 @@ export class AppComponent {
   list: FlowOptions[] = [];
   zooming = true;
   childDragging = true;
+  direction = new FormControl<'horizontal' | 'vertical'>('horizontal');
   linkingFrom: number | null = null; // Store the index of the node that we start linking from
   @ViewChild(FlowComponent) flowComponent: FlowComponent;
 
