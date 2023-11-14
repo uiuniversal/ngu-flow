@@ -1,10 +1,8 @@
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { NgForOf } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { FlowChildComponent } from './flow/flow-child.component';
-import { FlowComponent } from './flow/flow.component';
-import { FlowOptions } from './flow/flow-interface';
+import { FlowComponent, FlowChildComponent, FlowOptions } from 'flow';
 
 @Component({
   selector: 'app-root',

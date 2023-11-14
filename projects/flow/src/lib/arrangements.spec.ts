@@ -1,5 +1,5 @@
 import { Arrangements } from './arrangements';
-import { ChildInfo } from './connections';
+import { ChildInfo } from './flow-interface';
 
 export const FLOW_LIST = [
   { x: 40, y: 40, id: '1', deps: [] },

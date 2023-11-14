@@ -1,5 +1,4 @@
-import { FlowOptions } from './flow-interface';
-import { ChildInfo } from './connections';
+import { FlowOptions, ChildInfo } from './flow-interface';
 
 export class Arrangements {
   constructor(

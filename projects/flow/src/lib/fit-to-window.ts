@@ -1,4 +1,4 @@
-import { ChildInfo } from './connections';
+import { ChildInfo } from './flow-interface';
 
 export class FitToWindow {
   cRect: CPosition;

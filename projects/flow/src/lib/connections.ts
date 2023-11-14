@@ -1,4 +1,4 @@
-import { FlowOptions } from './flow-interface';
+import { ChildInfo, FlowOptions } from './flow-interface';
 import { FlowChildComponent } from './flow-child.component';
 
 export class Connections {
@@ -162,11 +162,4 @@ export class Connections {
       });
     });
   }
-}
-
-export interface ChildInfo {
-  position: FlowOptions;
-  dots?: DOMRect[];
-  el?: HTMLElement;
-  elRect: DOMRect;
 }

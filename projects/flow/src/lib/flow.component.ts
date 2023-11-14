@@ -12,10 +12,10 @@ import {
 } from '@angular/core';
 import { startWith } from 'rxjs';
 import { Arrangements } from './arrangements';
-import { ChildInfo, Connections } from './connections';
+import { Connections } from './connections';
 import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
-import { FlowOptions } from './flow-interface';
+import { FlowOptions, ChildInfo } from './flow-interface';
 import { SvgHandler } from './svg';
 import { FitToWindow } from './fit-to-window';
 

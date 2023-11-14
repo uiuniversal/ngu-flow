@@ -1,5 +1,5 @@
-import { FlowOptions } from './flow-interface';
-import { ChildInfo, Connections } from './connections';
+import { FlowOptions, ChildInfo } from './flow-interface';
+import { Connections } from './connections';
 
 describe('Connections', () => {
   let connections: Connections;
