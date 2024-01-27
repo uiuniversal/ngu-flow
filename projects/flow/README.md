@@ -1,6 +1,9 @@
 # Angular Flow
 
 Angular Flow is a component that allows you to create a flow diagram using Angular.
+Live Demo [link](https://sheikalthaf.github.io/flow/)
+
+Stackblitz Demo [link](https://stackblitz.com/edit/ngu-flow)
 
 ## Installation
 
