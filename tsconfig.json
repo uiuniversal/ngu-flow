@@ -8,7 +8,7 @@
     "strict": true,
     "noImplicitOverride": true,
     "paths": {
-      "flow": ["./projects/flow/src/public-api.ts"]
+      "@ngu/flow": ["./projects/flow/src/public-api.ts"]
     },
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,

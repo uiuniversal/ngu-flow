@@ -7,17 +7,17 @@ body {
   margin: 0;
 }
 
-// @keyframes dash {
-//   to {
-//     stroke-dashoffset: 100; /* Adjust this value to control the speed of the animation */
-//   }
-// }
+@keyframes dash {
+  to {
+    stroke-dashoffset: 100; /* Adjust this value to control the speed of the animation */
+  }
+}
 
-// path {
-//   fill: none;
-//   stroke: blue;
-//   stroke-width: 2;
-//   stroke-dasharray: 5, 5; /* You can adjust these values to control the appearance of the dashes (dots) */
-//   stroke-dashoffset: 5;
-//   animation: dash 4s linear reverse infinite; /* The 'infinite' value will make the animation repeat indefinitely */
-// }
+.animate-path path {
+  fill: none;
+  stroke: gray;
+  stroke-width: 2;
+  stroke-dasharray: 5, 5; /* You can adjust these values to control the appearance of the dashes (dots) */
+  stroke-dashoffset: 5;
+  animation: dash 4s linear reverse infinite; /* The 'infinite' value will make the animation repeat indefinitely */
+}

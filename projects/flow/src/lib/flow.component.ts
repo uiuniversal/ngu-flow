@@ -9,6 +9,7 @@ import {
   ViewChild,
   ElementRef,
   NgZone,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { startWith } from 'rxjs';
 import { Arrangements } from './arrangements';
@@ -19,11 +20,14 @@ import { FlowOptions, ChildInfo } from './flow-interface';
 import { SvgHandler } from './svg';
 import { FitToWindow } from './fit-to-window';
 
+const BASE_SCALE_AMOUNT = 0.05;
+
 @Component({
   standalone: true,
   imports: [NgForOf, FlowChildComponent],
   providers: [FlowService],
-  selector: 'app-flow',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'ngu-flow',
   template: ` <div class="zoom-container" #zoomContainer>
     <svg #svg>
       <defs>
@@ -35,18 +39,18 @@ import { FitToWindow } from './fit-to-window';
           refY="3.5"
           orient="auto"
         >
-          <polygon fill="blue" points="0 0, 10 3.5, 0 7"></polygon>
+          <polygon points="0 0, 10 3.5, 0 7"></polygon>
         </marker>
       </defs>
       <g #g></g>
       <!-- <g #guideLines></g> -->
 
-      <!-- <text font-size="20" writing-mode="tb" text-anchor="middle">
-          <textPath xlink:href="#arrow2-to-1" startOffset="50%">
-            Follow me
-          </textPath>
-        </text> -->
-      <text font-size="20" dy="20" dx="10">
+      <!-- <text font-size="20" text-anchor="middle">
+        <textPath xlink:href="#arrow2-to-1" startOffset="50%">
+          Follow me
+        </textPath>
+      </text> -->
+      <!-- <text font-size="20" dy="20" dx="10">
         <textPath
           xlink:href="#arrow2-to-1"
           startOffset="50%"
@@ -63,13 +67,16 @@ import { FitToWindow } from './fit-to-window';
         >
           Follow me
         </textPath>
-      </text>
+      </text> -->
     </svg>
     <ng-content></ng-content>
   </div>`,
   styles: [
     `
       :host {
+        --dot-size: 10px;
+        --flow-dot-color: red;
+        --flow-path-color: blue;
         --grid-size: 20px;
         display: block;
         height: 100%;
@@ -104,6 +111,10 @@ import { FitToWindow } from './fit-to-window';
         pointer-events: none;
         overflow: visible;
       }
+
+      #arrowhead polygon {
+        fill: var(--flow-path-color);
+      }
     `,
   ],
 })
@@ -123,20 +134,15 @@ export class FlowComponent
   initialY = 0;
 
   constructor(
-    private el: ElementRef<HTMLElement>,
+    public el: ElementRef<HTMLElement>,
     public flow: FlowService,
     private ngZone: NgZone
   ) {
     this.flow.zoomContainer = this.el.nativeElement;
     this.flow.arrowsChange.subscribe((e) => this.updateArrows(e));
     this.ngZone.runOutsideAngular(() => {
-      this.flow.enableZooming.subscribe((enable) => {
-        if (enable) {
-          this.el.nativeElement.addEventListener('wheel', this.zoomHandle);
-        } else {
-          this.el.nativeElement.removeEventListener('wheel', this.zoomHandle);
-        }
-      });
+      this.el.nativeElement.addEventListener('wheel', this._wheelPanning);
+
       this.el.nativeElement.addEventListener(
         'mousedown',
         this._startDraggingZoomContainer
@@ -200,6 +206,19 @@ export class FlowComponent
     }
   };
 
+  public _wheelPanning = (event: WheelEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      if (!this.flow.enableZooming.value) return;
+      this.zoomHandle(event);
+    } else {
+      this.flow.panX -= event.deltaX;
+      this.flow.panY -= event.deltaY;
+      this.updateZoomContainer();
+    }
+  };
+
   public zoomHandle = (event: WheelEvent) => {
     if (this.flow.isDraggingZoomContainer || this.flow.isChildDragging) return;
     event.stopPropagation();
@@ -237,10 +256,8 @@ export class FlowComponent
     panY: number,
     scale: number
   ) {
-    const baseScaleAmount = 0.02; // You can adjust this base scale amount
-
     // Make scaleAmount proportional to the current scale
-    const scaleAmount = baseScaleAmount * scale;
+    const scaleAmount = BASE_SCALE_AMOUNT * scale;
     // const scaleAmount = 0.02;
 
     // Calculate new scale
@@ -330,7 +347,7 @@ export class FlowComponent
   // }
 
   private updateZoomContainer() {
-    this.zoomContainer.nativeElement.style.transform = `translate(${this.flow.panX}px, ${this.flow.panY}px) scale(${this.flow.scale})`;
+    this.zoomContainer.nativeElement.style.transform = `translate3d(${this.flow.panX}px, ${this.flow.panY}px, 0) scale(${this.flow.scale})`;
   }
 
   arrangeChildren() {
@@ -409,7 +426,7 @@ export class FlowComponent
           );
           pathElement.setAttribute('d', arrow.d);
           pathElement.setAttribute('id', arrow.id);
-          pathElement.setAttribute('stroke', 'blue');
+          pathElement.setAttribute('stroke', 'var(--flow-path-color)');
           pathElement.setAttribute('stroke-width', '2');
           pathElement.setAttribute('fill', 'none');
           pathElement.setAttribute('marker-end', 'url(#arrowhead)');
@@ -488,7 +505,11 @@ export class FlowComponent
         );
 
         // we need to reverse the path because the arrow head is at the end
-        arrow.d = new SvgHandler().blendCorners(endDot, startDot);
+        arrow.d = new SvgHandler().blendCorners(
+          endDot,
+          startDot,
+          this.flow.config.ArrowSize
+        );
       }
 
       // Update the SVG paths

@@ -1,24 +1,50 @@
-# Flow
+# Angular Flow
 
-This library was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.0.0.
+Angular Flow is a component that allows you to create a flow diagram using Angular.
 
-## Code scaffolding
+## Installation
 
-Run `ng generate component component-name --project flow` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module --project flow`.
-> Note: Don't forget to add `--project flow` or else it will be added to the default project in your `angular.json` file. 
+```bash
+npm install @ngu/flow
+```
 
-## Build
+## Usage
 
-Run `ng build flow` to build the project. The build artifacts will be stored in the `dist/` directory.
+```ts
+import { Component } from "@angular/core";
+import { FlowComponent, FlowChildComponent } from "@ngu/flow";
 
-## Publishing
-
-After building your library with `ng build flow`, go to the dist folder `cd dist/flow` and run `npm publish`.
-
-## Running unit tests
-
-Run `ng test flow` to execute the unit tests via [Karma](https://karma-runner.github.io).
-
-## Further help
-
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+@Component({
+  selector: "app-root",
+  standalone: true,
+  imports: [FlowComponent, FlowChildComponent],
+  template: `
+    <ngu-flow class="flow">
+      @for (item of lists; track item.id; let i = $index) {
+      <div [flowChild]="item" class="child">{{ i }}</div>
+      }
+    </ngu-flow>
+  `,
+  styles: `
+  .flow {
+    min-height: 90vh;
+    background: #eee;
+  }
+  .child {
+    border: 1px solid #ccc;
+    width: 100px;
+    height: 50px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  `,
+})
+export class AppComponent {
+  lists = [
+    { id: "1", x: 0, y: 0, deps: [] },
+    { id: "2", x: 0, y: 0, deps: ["1"] },
+  ];
+}
+```

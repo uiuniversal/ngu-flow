@@ -11,3 +11,8 @@ export interface FlowOptions {
   id: string;
   deps: string[];
 }
+
+export class FlowConfig {
+  Arrows = true;
+  ArrowSize = 20;
+}

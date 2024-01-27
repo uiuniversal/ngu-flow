@@ -96,9 +96,10 @@ export class Arrangements {
     } else {
       y = baseY + (dependents.length ? (startY - baseY) / 2 - height / 2 : 0);
 
+      // TODO: This is not working as expected
       // If there are more than one dependency, We need to center the node based on the parents
       if (baseNode.position.deps.length > 1) {
-        const len = baseNode.position.deps.length - 1;
+        const len = baseNode.position.deps.length / 2;
         const halfVerticalPadding = (this.verticalPadding * len) / 2;
         y -= baseNode.elRect.height * len - halfVerticalPadding;
       }

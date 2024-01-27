@@ -10,6 +10,7 @@ import {
   NgZone,
   OnChanges,
   SimpleChanges,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription } from 'rxjs';
@@ -20,6 +21,7 @@ import { FlowOptions } from './flow-interface';
   standalone: true,
   imports: [CommonModule],
   selector: '[flowChild]',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<ng-content></ng-content>
     <div #dot class="dot dot-top"></div>
     <div #dot class="dot dot-right"></div>
@@ -28,12 +30,11 @@ import { FlowOptions } from './flow-interface';
   styles: [
     `
       .dot {
-        --dot-size: 10px;
-        --dot-half-size: -5px;
+        --dot-half-size: calc(var(--dot-size) / 2 * -1);
         position: absolute;
         width: var(--dot-size);
         height: var(--dot-size);
-        background: red;
+        background: var(--flow-dot-color);
         border-radius: 999px;
       }
       .dot-left {
@@ -95,7 +96,7 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
 
     this.positionChange.subscribe((x) => {
       const { left, top } = this.flow.zRect;
-      if (!this.position) console.log(this.position);
+      // if (!this.position) console.log(this.position);
       this.updatePosition(this.position.x + left, this.position.y + top);
     });
   }
@@ -143,10 +144,7 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
 
   private enableDragging() {
     this.mouseMoveSubscription = this.flow.onMouse.subscribe(this.onMouseMove);
-    // mouse up event
     this.el.nativeElement.addEventListener('mouseup', this.onMouseUp);
-
-    // mouse down event
     this.el.nativeElement.addEventListener('mousedown', this.onMouseDown);
   }
 
@@ -161,14 +159,14 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    console.log(`ngOnChanges ${this.position.id}`, changes);
+    // console.log(`ngOnChanges ${this.position.id}`, changes);
     // if (changes['position']) {
     //   this.updatePosition(this.position.x, this.position.y);
     // }
   }
 
   private updatePosition(x: number, y: number) {
-    this.el.nativeElement.style.transform = `translate(${x}px, ${y}px)`;
+    this.el.nativeElement.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }
 
   ngOnDestroy() {

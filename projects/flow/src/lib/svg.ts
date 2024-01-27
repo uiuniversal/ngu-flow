@@ -2,8 +2,6 @@ import { FlowOptions } from './flow-interface';
 import { DotOptions } from './flow.component';
 
 export class SvgHandler {
-  arrowSize = 20;
-
   // 'controlPointDistance' is a new property to be defined. It determines how 'curvy' the path should be.
   // Adjust this value to increase or decrease the curvature of the Bezier path.
   controlPointDistance = 50; // Example value, adjust as needed
@@ -56,11 +54,15 @@ export class SvgHandler {
     return `M${start.x} ${start.y} L${midX} ${start.y} L${midX} ${end.y} L${end.x} ${end.y}`;
   }
 
-  blendCorners1(start: FlowOptions, end: FlowOptions): string {
+  blendCorners1(
+    start: FlowOptions,
+    end: FlowOptions,
+    arrowSize: number
+  ): string {
     // include the arrow size
     let { x: startX, y: startY } = start;
     let { x: endX, y: endY } = end;
-    endX -= this.arrowSize;
+    endX -= arrowSize;
     // Define two control points for the cubic Bezier curve
     const cp1 = { x: startX + (endX - startX) / 3, y: startY };
     const cp2 = { x: endX - (endX - startX) / 3, y: endY };
@@ -69,13 +71,13 @@ export class SvgHandler {
     return `M${startX} ${startY} C${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${endX} ${endY}`;
   }
 
-  blendCorners(start: DotOptions, end: DotOptions): string {
+  blendCorners(start: DotOptions, end: DotOptions, arrowSize: number): string {
     let { x: startX, y: startY, dotIndex: startDotIndex } = start;
     let { x: endX, y: endY, dotIndex: endDotIndex } = end;
 
     // Determine the direction from the dotIndex and adjust the start and end points
-    let startAdjustment = this.getDirectionAdjustment(startDotIndex);
-    let endAdjustment = this.getDirectionAdjustment(endDotIndex);
+    let startAdjustment = this.getDirectionAdjustment(startDotIndex, arrowSize);
+    let endAdjustment = this.getDirectionAdjustment(endDotIndex, arrowSize);
 
     startX += startAdjustment.x;
     startY += startAdjustment.y;
@@ -96,7 +98,10 @@ export class SvgHandler {
     return path;
   }
 
-  getDirectionAdjustment(dotIndex: number): {
+  getDirectionAdjustment(
+    dotIndex: number,
+    arrowSize: number
+  ): {
     x: number;
     y: number;
     cpX: number;
@@ -106,13 +111,13 @@ export class SvgHandler {
       case 0: // top
         return {
           x: 0,
-          y: -this.arrowSize,
+          y: -arrowSize,
           cpX: 0,
           cpY: -this.controlPointDistance,
         };
       case 1: // right
         return {
-          x: this.arrowSize,
+          x: arrowSize,
           y: 0,
           cpX: this.controlPointDistance,
           cpY: 0,
@@ -120,13 +125,13 @@ export class SvgHandler {
       case 2: // bottom
         return {
           x: 0,
-          y: this.arrowSize,
+          y: arrowSize,
           cpX: 0,
           cpY: this.controlPointDistance,
         };
       case 3: // left
         return {
-          x: -this.arrowSize,
+          x: -arrowSize,
           y: 0,
           cpX: -this.controlPointDistance,
           cpY: 0,
