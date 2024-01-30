@@ -1,4 +1,4 @@
-import { FlowOptions, ChildInfo } from './flow-interface';
+import { FlowOptions, ChildInfo, FlowDirection } from './flow-interface';
 
 export class Arrangements {
   constructor(
@@ -21,12 +21,12 @@ export class Arrangements {
 
     for (const baseNode of baseNodes) {
       if (this.direction === 'horizontal') {
-        this.positionDependents(baseNode, currentX, 0, newItems);
-        currentX += baseNode.elRect.width + this.horizontalPadding;
+        this.positionDependents(baseNode, 0, currentY, newItems);
+        currentY += baseNode.elRect.height + this.verticalPadding;
       } else {
         // Vertical arrangement
-        this.positionDependents(baseNode, 0, currentY, newItems);
-        currentY += baseNode.elRect.height + this.horizontalPadding;
+        this.positionDependents(baseNode, 0, currentX, newItems);
+        currentX += baseNode.elRect.width + this.verticalPadding;
       }
     }
 
@@ -114,5 +114,112 @@ export class Arrangements {
       dependents.length > 1 ? this.groupPadding - this.verticalPadding : 0;
     const consumedSpace = startY + (dependents.length ? 0 : height) + groupPad;
     return { consumedSpace, dep: dependents.length > 0 };
+  }
+}
+
+const ROOT_DATA = new Map<string, ArrangeNode>();
+const ROOT_DEPS = new Map<string, string[]>();
+const HORIZONTAL_PADDING = 100;
+const VERTICAL_PADDING = 20;
+
+export class Arrangements2 {
+  root: string[] = [];
+
+  constructor(
+    private list: ChildInfo[],
+    private direction: FlowDirection = 'vertical',
+    public horizontalPadding = 100,
+    public verticalPadding = 20,
+    public groupPadding = 20
+  ) {
+    ROOT_DATA.clear();
+    ROOT_DEPS.clear();
+    this.list.forEach((item) => {
+      ROOT_DATA.set(
+        item.position.id,
+        new ArrangeNode(item.position, item.elRect)
+      );
+      item.position.deps.forEach((dep) => {
+        let d = ROOT_DEPS.get(dep) || [];
+        d.push(item.position.id);
+        ROOT_DEPS.set(dep, d);
+      });
+
+      if (item.position.deps.length === 0) {
+        this.root.push(item.position.id);
+      }
+    });
+  }
+
+  public autoArrange(): Map<string, FlowOptions> {
+    this.root.forEach((id) => {
+      const node = ROOT_DATA.get(id)!;
+      node.arrange(0, 0, this.direction);
+    });
+
+    const newItems = new Map<string, FlowOptions>();
+
+    for (const item of this.list) {
+      newItems.set(item.position.id, item.position);
+    }
+    return newItems;
+  }
+}
+
+interface Coordinates {
+  x: number;
+  y: number;
+}
+
+export class ArrangeNode {
+  constructor(public position: FlowOptions, public elRect: DOMRect) {}
+
+  get deps() {
+    return ROOT_DEPS.get(this.position.id) || [];
+  }
+
+  // we need to recursively call this method to get all the dependents of the node
+  // and then we need to position them
+  arrange(x = 0, y = 0, direction: FlowDirection): Coordinates {
+    const dependents = ROOT_DEPS.get(this.position.id) || [];
+    let startX = x;
+    let startY = y;
+    let len = dependents.length;
+
+    if (len) {
+      if (direction === 'horizontal') {
+        startX += this.elRect.width + HORIZONTAL_PADDING;
+      } else {
+        startY += this.elRect.height + HORIZONTAL_PADDING;
+      }
+      let first, last: Coordinates;
+      for (let i = 0; i < len; i++) {
+        const dep = dependents[i];
+        const dependent = ROOT_DATA.get(dep)!;
+        const { x, y } = dependent.arrange(startX, startY, direction);
+        // capture the first and last dependent
+        if (i === 0) first = dependent.position;
+        if (i === len - 1) last = dependent.position;
+
+        if (direction === 'horizontal') {
+          startY = y + VERTICAL_PADDING;
+        } else {
+          startX = x + VERTICAL_PADDING;
+        }
+      }
+      if (direction === 'horizontal') {
+        startY -= VERTICAL_PADDING + this.elRect.height;
+        y = first!.y + (last!.y - first!.y) / 2;
+      } else {
+        startX -= VERTICAL_PADDING + this.elRect.width;
+        x = first!.x + (last!.x - first!.x) / 2;
+      }
+    }
+    this.position.x = x;
+    this.position.y = y;
+
+    return direction === 'horizontal'
+      ? { x: startX, y: startY + this.elRect.height }
+      : { x: startX + this.elRect.width, y: startY };
   }
 }
