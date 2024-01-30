@@ -5,4 +5,10 @@
 export * from './lib/flow.service';
 export * from './lib/flow.component';
 export * from './lib/flow-child.component';
-export * from './lib/flow-interface';
+export {
+  ArrowPathFn,
+  FlowOptions,
+  FlowDirection,
+  FlowConfig,
+} from './lib/flow-interface';
+export * from './lib/svg';

@@ -1,13 +1,20 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { DemoService } from './demo.service';
+import {
+  FlowDirection,
+  flowPath,
+  bezierPath,
+  blendCorners,
+  blendCorners1,
+} from '@ngu/flow';
 
 @Component({
   selector: 'app-toolbar',
   standalone: true,
   imports: [ReactiveFormsModule],
   template: `<div class="flex items-center gap-3">
-    <button (click)="trigger()">Arrange</button>
+    <button (click)="trigger()">Auto Arrange</button>
     <label for="zoomingId">
       <input
         id="zoomingId"
@@ -34,6 +41,15 @@ import { DemoService } from './demo.service';
     </label>
     <button (click)="fitToWindow()">Fit to window</button>
 
+    <!-- Arrow Types -->
+    <label for="arrowType">
+      <select id="arrowType" [formControl]="arrowType">
+        @for (fn of arrowFns; track fn; let i = $index) {
+        <option [value]="i">Arrow {{ i }}</option>
+        }
+      </select>
+    </label>
+
     <!-- radio group for horizontal or vertical -->
     <label for="direction">
       <input
@@ -57,10 +73,21 @@ export class ToolbarComponent implements OnInit {
   zooming = true;
   childDragging = true;
   animatePath = false;
-  direction = new FormControl<'horizontal' | 'vertical'>('horizontal');
+  direction = new FormControl<FlowDirection>('horizontal');
   demoService = inject(DemoService);
 
-  constructor() {}
+  arrowType = new FormControl<number>(0);
+
+  arrowFns = [blendCorners, blendCorners1, flowPath, bezierPath];
+
+  constructor() {
+    this.direction.valueChanges.subscribe((val) => {
+      this.demoService.flow.updateDirection(this.direction.value!);
+    });
+    this.arrowType.valueChanges.subscribe((val) => {
+      this.demoService.flow.updateArrowFn(this.arrowFns[val!]);
+    });
+  }
 
   ngOnInit() {}
 

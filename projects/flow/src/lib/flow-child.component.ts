@@ -12,7 +12,6 @@ import {
   SimpleChanges,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription } from 'rxjs';
 import { FlowService } from './flow.service';
 import { FlowOptions } from './flow-interface';
@@ -70,6 +69,7 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
 
   private positionChange = new Subject<FlowOptions>();
   private mouseMoveSubscription: Subscription;
+  private layoutSubscribe: Subscription;
 
   constructor(
     public el: ElementRef<HTMLDivElement>,
@@ -89,7 +89,7 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
       });
     });
 
-    this.flow.layoutUpdated.pipe(takeUntilDestroyed()).subscribe((x) => {
+    this.layoutSubscribe = this.flow.layoutUpdated.subscribe((x) => {
       this.position = this.flow.items.get(this.position.id) as FlowOptions;
       this.positionChange.next(this.position);
     });
@@ -171,6 +171,7 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnDestroy() {
     this.disableDragging();
+    this.layoutSubscribe.unsubscribe();
     // remove the FlowOptions from the flow service
     // this.flow.delete(this.position);
     // console.log('ngOnDestroy', this.position.id);

@@ -12,12 +12,18 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { startWith } from 'rxjs';
-import { Arrangements } from './arrangements';
+import { Arrangements2 as Arrangements } from './arrangements';
 import { Connections } from './connections';
 import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
-import { FlowOptions, ChildInfo } from './flow-interface';
-import { SvgHandler } from './svg';
+import {
+  FlowOptions,
+  ChildInfo,
+  FlowDirection,
+  DotOptions,
+  ArrowPathFn,
+} from './flow-interface';
+import { blendCorners, flowPath, bezierPath, blendCorners1 } from './svg';
 import { FitToWindow } from './fit-to-window';
 
 const BASE_SCALE_AMOUNT = 0.05;
@@ -160,14 +166,12 @@ export class FlowComponent
 
   ngAfterViewInit(): void {
     this.createArrows();
-    // this.updateZoomContainer();
   }
 
   ngAfterContentInit() {
     this.children.changes
       .pipe(startWith(this.children))
       .subscribe((children) => {
-        // console.log('children changed', children);
         this.flow.update(this.children.map((x) => x.position));
         this.arrangeChildren();
         this.createArrows();
@@ -183,10 +187,20 @@ export class FlowComponent
     this.flow.enableZooming.next(enable);
   }
 
+  updateDirection(direction: FlowDirection) {
+    this.flow.direction = direction;
+    this.arrangeChildren();
+    this.createArrows();
+  }
+
+  updateArrowFn(fn: ArrowPathFn) {
+    this.flow.arrowFn = fn;
+    this.createArrows();
+  }
+
   public _startDraggingZoomContainer = (event: MouseEvent) => {
     event.stopPropagation();
     this.flow.isDraggingZoomContainer = true;
-    // const containerRect = this.el.nativeElement.getBoundingClientRect();
     this.initialX = event.clientX - this.flow.panX;
     this.initialY = event.clientY - this.flow.panY;
   };
@@ -258,11 +272,8 @@ export class FlowComponent
   ) {
     // Make scaleAmount proportional to the current scale
     const scaleAmount = BASE_SCALE_AMOUNT * scale;
-    // const scaleAmount = 0.02;
-
     // Calculate new scale
     const newScale = scale + scaleDirection * scaleAmount;
-
     // Calculate new pan values to keep the zoom point in the same position on the screen
     const newPanX = wheelClientX + ((panX - wheelClientX) * newScale) / scale;
     const newPanY = wheelClientY + ((panY - wheelClientY) * newScale) / scale;
@@ -285,73 +296,11 @@ export class FlowComponent
     this.updateZoomContainer();
   }
 
-  // fitToWindow() {
-  //   // The amount of padding to leave around the edges of the container and it should be scale independent
-  //   const containerPadding = 30 / this.flow.scale;
-  //   // Step 1: Get the positions of all nodes and dimensions of the container
-  //   const positions = this.list.map((child) => {
-  //     const scaledX = child.elRect.x / this.flow.scale - this.flow.panX;
-  //     const scaledY = child.elRect.y / this.flow.scale - this.flow.panY;
-  //     const scaledWidth = child.elRect.width;
-  //     const scaledHeight = child.elRect.height;
-  //     return {
-  //       x: scaledX,
-  //       y: scaledY,
-  //       width: scaledWidth,
-  //       height: scaledHeight,
-  //     };
-  //   });
-  //   const containerRect =
-  //     this.zoomContainer.nativeElement.getBoundingClientRect();
-
-  //   // Step 2: Calculate the boundaries (min and max coordinates) of the nodes
-  //   const minX = Math.min(...positions.map((p) => p.x));
-  //   const maxX = Math.max(...positions.map((p) => p.x + p.width));
-  //   const minY = Math.min(...positions.map((p) => p.y));
-  //   const maxY = Math.max(...positions.map((p) => p.y + p.height));
-
-  //   // Step 3: Determine the scaling factor to fit nodes within the container
-  //   const adjMaxX = maxX - minX + containerPadding;
-  //   const adjMaxY = maxY - minY + containerPadding;
-
-  //   // find the actual width and height of the container after scale
-  //   const cRect = {
-  //     x: containerRect.x / this.flow.scale - this.flow.panX,
-  //     y: containerRect.y / this.flow.scale - this.flow.panY,
-  //     width: containerRect.width / this.flow.scale,
-  //     height: containerRect.height / this.flow.scale,
-  //   };
-
-  //   const scaleX = cRect.width / adjMaxX;
-  //   const scaleY = cRect.height / adjMaxY;
-  //   const newScale = Math.min(scaleX, scaleY);
-
-  //   // Step 4: Determine the panning values to center the content within the container
-  //   // These are now calculated relative to the unscaled positions
-  //   const panX =
-  //     cRect.x +
-  //     (cRect.width - (adjMaxX - containerPadding) * newScale) / 2 -
-  //     minX * newScale;
-  //   const panY =
-  //     cRect.y +
-  //     (cRect.height - (adjMaxY - containerPadding) * newScale) / 2 -
-  //     minY * newScale;
-
-  //   // Apply the calculated scale and pan values
-  //   this.flow.scale = newScale;
-  //   this.flow.panX = panX;
-  //   this.flow.panY = panY;
-
-  //   // Update the zoomContainer's transform property to apply the new scale and pan
-  //   this.updateZoomContainer();
-  // }
-
   private updateZoomContainer() {
     this.zoomContainer.nativeElement.style.transform = `translate3d(${this.flow.panX}px, ${this.flow.panY}px, 0) scale(${this.flow.scale})`;
   }
 
   arrangeChildren() {
-    // this.flow.connections = new Connections(this.list);
     const arrangements = new Arrangements(
       this.list,
       this.flow.direction,
@@ -360,12 +309,7 @@ export class FlowComponent
       this.flow.groupPadding
     );
     const newList = arrangements.autoArrange();
-    // console.log('new list', Object.fromEntries(newList));
     this.flow.update([...newList.values()]);
-    // this.flow.items.clear();
-    // newList.forEach((value, key) => {
-    //   this.flow.items.set(key, value);
-    // });
     this.flow.layoutUpdated.next();
   }
 
@@ -400,12 +344,10 @@ export class FlowComponent
     // Clear existing arrows
     this.flow.arrows = [];
     const gElement: SVGGElement = this.g.nativeElement;
-
     // Remove existing paths
     while (gElement.firstChild) {
       gElement.removeChild(gElement.firstChild);
     }
-
     // Calculate new arrows
     this.list.forEach((item) => {
       item.position.deps.forEach((depId) => {
@@ -455,18 +397,9 @@ export class FlowComponent
   }
 
   updateArrows(e?: FlowOptions) {
-    const containerRect = this.el.nativeElement.getBoundingClientRect();
     const gElement: SVGGElement = this.g.nativeElement;
-    // Clear existing arrows
-    // const childObj = this.children.toArray().reduce((acc, curr) => {
-    //   acc[curr.position.id] = curr;
-    //   return acc;
-    // }, {} as Record<string, FlowChildComponent>);
     const childObj = this.getChildInfo();
-
     // Handle reverse dependencies
-    // this.closestDots.clear();
-    // this.reverseDepsMap.clear();
     this.flow.connections = new Connections(this.list, this.flow.direction);
 
     // Calculate new arrows
@@ -476,16 +409,6 @@ export class FlowComponent
       const toItem = childObj[to];
       if (fromItem && toItem) {
         const [endDotIndex, startDotIndex] = this.getClosestDots(toItem, from);
-        // const toClosestDots = this.getClosestDots(
-        //   toItem.position,
-        //   from,
-        //   childObj
-        // );
-
-        // Assuming 0 is a default value, replace it with actual logic
-        // const startDotIndex = fromClosestDots[0] || 0;
-        // const endDotIndex = toClosestDots[0] || 0;
-        // console.log('startDotIndex', startDotIndex, endDotIndex);
 
         const startDot = this.getDotByIndex(
           childObj,
@@ -505,10 +428,11 @@ export class FlowComponent
         );
 
         // we need to reverse the path because the arrow head is at the end
-        arrow.d = new SvgHandler().blendCorners(
+        arrow.d = this.flow.arrowFn(
           endDot,
           startDot,
-          this.flow.config.ArrowSize
+          this.flow.config.ArrowSize,
+          2
         );
       }
 
@@ -550,8 +474,6 @@ export class FlowComponent
   ): DotOptions {
     const child = childObj[item.id];
     const childDots = child.dots as DOMRect[];
-    // console.log('childDots', childDots, dotIndex, item.id);
-
     // Make sure the dot index is within bounds
     if (dotIndex < 0 || dotIndex >= childDots.length) {
       throw new Error(`Invalid dot index: ${dotIndex}`);
@@ -567,25 +489,10 @@ export class FlowComponent
   }
 
   public getClosestDots(item: ChildInfo, dep?: string): number[] {
-    return this.flow.connections.getClosestDotsSimplified(
-      item,
-      dep as string
-      // newObj
-    );
+    return this.flow.connections.getClosestDotsSimplified(item, dep as string);
   }
 
   ngOnDestroy(): void {
     this.el.nativeElement.removeEventListener('wheel', this.zoomHandle);
   }
-}
-
-export interface DotOptions extends FlowOptions {
-  /**
-   * The index of the dot
-   * top = 0
-   * right = 1
-   * bottom = 2
-   * left = 3
-   */
-  dotIndex: number;
 }

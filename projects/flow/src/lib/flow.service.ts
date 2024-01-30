@@ -1,7 +1,13 @@
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { Connections } from './connections';
-import { FlowConfig, FlowOptions } from './flow-interface';
+import {
+  ArrowPathFn,
+  FlowConfig,
+  FlowDirection,
+  FlowOptions,
+} from './flow-interface';
+import { blendCorners } from './svg';
 
 @Injectable()
 export class FlowService {
@@ -13,7 +19,7 @@ export class FlowService {
   isChildDragging: boolean;
   enableChildDragging = new BehaviorSubject(true);
   enableZooming = new BehaviorSubject(true);
-  direction: 'horizontal' | 'vertical' = 'horizontal';
+  direction: FlowDirection = 'horizontal';
   horizontalPadding = 100;
   verticalPadding = 20;
   groupPadding = 40;
@@ -26,6 +32,8 @@ export class FlowService {
   connections: Connections;
   layoutUpdated = new Subject<void>();
   onMouse = new Subject<MouseEvent>();
+
+  arrowFn: ArrowPathFn = blendCorners;
 
   constructor(private ngZone: NgZone) {
     this.ngZone.runOutsideAngular(() => {

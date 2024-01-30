@@ -1,8 +1,11 @@
 import { Routes } from '@angular/router';
-import { FlowDemoComponent } from './flow-demo.component';
+import { DemoOneComponent } from './demo/demo-one.component';
 import { SvgComponent } from './svg.component';
+import { DemoTwoComponent } from './demo/demo-two.component';
 
 export const routes: Routes = [
-  { path: '', component: FlowDemoComponent },
-  { path: 'svg', component: SvgComponent }
+  { path: 'one', component: DemoOneComponent },
+  { path: 'two', component: DemoTwoComponent },
+  { path: 'svg', component: SvgComponent },
+  { path: '', redirectTo: '/one', pathMatch: 'full' },
 ];

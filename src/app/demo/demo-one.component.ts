@@ -6,12 +6,12 @@ import {
   inject,
 } from '@angular/core';
 import { FlowComponent, FlowChildComponent, FlowOptions } from '@ngu/flow';
-import { EditorComponent } from './editor.component';
-import { ToolbarComponent } from './demo/toolbar.component';
-import { DemoService } from './demo/demo.service';
+import { EditorComponent } from '../editor.component';
+import { ToolbarComponent } from './toolbar.component';
+import { DemoService } from './demo.service';
 
 @Component({
-  selector: 'app-root',
+  selector: 'app-demo-one',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -36,7 +36,7 @@ import { DemoService } from './demo/demo.service';
           >
             {{ item.id }}
           </div>
-          <button (click)="addNode(item)">Add</button>
+          <button (click)="demoService.addNode(item, list)">Add</button>
           <button (click)="deleteNode(item.id)">Delete</button>
           <!-- <button (click)="startLinking(i)">Link</button> -->
         </div>
@@ -47,20 +47,8 @@ import { DemoService } from './demo/demo.service';
   styles: [
     `
       .card {
-        // display: flex;
-        // align-items: center;
-        // justify-content: center;
-        // width: 250px;
-        // min-height: 60px;
-        // border: 1px solid blue;
-        // box-shadow: 0 0 5px 0 rgb(0 0 255 / 36%);
         box-shadow: 0 0 5px 0 rgb(142 142 142 / 37%);
         border-radius: 5px;
-      }
-      app-flow {
-        --flow-dot-color: gray;
-        --flow-path-color: gray;
-        --dot-size: 1px;
       }
 
       button {
@@ -69,7 +57,7 @@ import { DemoService } from './demo/demo.service';
     `,
   ],
 })
-export class FlowDemoComponent implements AfterViewInit {
+export class DemoOneComponent implements AfterViewInit {
   title = 'angular-flow';
   list: FlowOptions[] = [];
   linkingFrom: number | null = null; // Store the index of the node that we start linking from
@@ -78,99 +66,14 @@ export class FlowDemoComponent implements AfterViewInit {
 
   constructor() {
     this.list = structuredClone(FLOW_LIST);
-    this.list = [
-      {
-        x: 40,
-        y: 40,
-        id: '1',
-        deps: [],
-      },
-      {
-        x: 249.09375,
-        y: -39,
-        id: '2',
-        deps: ['1'],
-      },
-      {
-        x: 476.09375,
-        y: 67,
-        id: '3',
-        deps: ['2'],
-      },
-      {
-        x: 662.09375,
-        y: 12,
-        id: '4',
-        deps: ['2'],
-      },
-      {
-        x: -58.90625,
-        y: 349,
-        id: '5',
-        deps: ['1'],
-      },
-      {
-        x: 381.09375,
-        y: 416,
-        id: '6',
-        deps: ['5'],
-      },
-      {
-        x: 164.09375,
-        y: 175,
-        id: '7',
-        deps: ['5'],
-      },
-      {
-        x: 164.09375,
-        y: 175,
-        id: '8',
-        deps: ['5'],
-      },
-      {
-        x: 688.09375,
-        y: 255,
-        id: '9',
-        deps: ['6', '7', '8'],
-      },
-    ];
   }
 
   ngAfterViewInit(): void {
     this.demoService.flow = this.flowComponent;
   }
 
-  addNode(item: FlowOptions) {
-    // find the highest id
-    const lastId = this.list.reduce((acc, cur) => Math.max(+cur.id, acc), 0);
-    const newNodeId = (lastId + 1).toString();
-    const newNode: FlowOptions = {
-      x: 40 + this.list.length * 160,
-      y: 40,
-      id: newNodeId,
-      deps: [item.id],
-    };
-    this.list.push(newNode);
-  }
-
   deleteNode(id: string) {
-    this.list = structuredClone(this.deleteNodeI(id, this.list));
-  }
-
-  deleteNodeI(id: string, list: FlowOptions[]) {
-    if (id && list.length > 0) {
-      const index = list.findIndex((x) => x.id == id);
-      const deletedNode = list.splice(index, 1)[0];
-      // Remove dependencies of the deleted node
-      return list.reduce((acc, item) => {
-        const initialLength = item.deps.length;
-        item.deps = item.deps.filter((dep) => dep !== deletedNode.id);
-        if (item.deps.length === initialLength || item.deps.length > 0)
-          acc.push(item);
-        return acc;
-      }, [] as FlowOptions[]);
-    }
-    return list;
+    this.list = structuredClone(this.demoService.deleteNodeI(id, this.list));
   }
 
   startLinking(index: number) {
