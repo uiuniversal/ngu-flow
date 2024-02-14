@@ -12,3 +12,6 @@ export {
   FlowConfig,
 } from './lib/flow-interface';
 export * from './lib/svg';
+export { FitToWindow } from './lib/plugins/fit-to-window';
+export { ScrollIntoView } from './lib/plugins/scroll-into-view';
+export { Arrangements } from './lib/plugins/arrangements';

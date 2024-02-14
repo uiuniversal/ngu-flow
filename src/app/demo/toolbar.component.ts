@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, inject } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { DemoService } from './demo.service';
 import {
@@ -39,7 +39,7 @@ import {
         (click)="animatePathFn()"
       />Animate
     </label>
-    <button (click)="fitToWindow()">Fit to window</button>
+    <button (click)="fitToWindowTrigger()">Fit to window</button>
 
     <!-- Arrow Types -->
     <label for="arrowType">
@@ -80,6 +80,9 @@ export class ToolbarComponent implements OnInit {
 
   arrowFns = [blendCorners, blendCorners1, flowPath, bezierPath];
 
+  @Output() fitToWindow = new EventEmitter<void>();
+  @Output() autoArrange = new EventEmitter<void>();
+
   constructor() {
     this.direction.valueChanges.subscribe((val) => {
       this.demoService.flow.updateDirection(this.direction.value!);
@@ -91,14 +94,12 @@ export class ToolbarComponent implements OnInit {
 
   ngOnInit() {}
 
-  fitToWindow() {
-    this.demoService.flow.fitToWindow();
+  fitToWindowTrigger() {
+    this.fitToWindow.emit();
   }
 
   trigger() {
-    // Your trigger logic here
-    this.demoService.flow.arrangeChildren();
-    this.demoService.flow.updateArrows();
+    this.autoArrange.emit();
   }
 
   childDraggingFn() {

@@ -10,9 +10,10 @@ import {
   ElementRef,
   NgZone,
   ChangeDetectionStrategy,
+  Input,
+  OnInit,
 } from '@angular/core';
 import { startWith } from 'rxjs';
-import { Arrangements2 as Arrangements } from './arrangements';
 import { Connections } from './connections';
 import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
@@ -22,9 +23,10 @@ import {
   FlowDirection,
   DotOptions,
   ArrowPathFn,
+  FlowConfig,
+  FlowPlugin,
 } from './flow-interface';
 import { blendCorners, flowPath, bezierPath, blendCorners1 } from './svg';
-import { FitToWindow } from './fit-to-window';
 
 const BASE_SCALE_AMOUNT = 0.05;
 
@@ -125,10 +127,11 @@ const BASE_SCALE_AMOUNT = 0.05;
   ],
 })
 export class FlowComponent
-  implements AfterContentInit, AfterViewInit, OnDestroy
+  implements OnInit, AfterContentInit, AfterViewInit, OnDestroy
 {
-  @ContentChildren(FlowChildComponent) children: QueryList<FlowChildComponent> =
-    new QueryList();
+  @Input() config: FlowConfig = new FlowConfig();
+  @ContentChildren(FlowChildComponent) children =
+    new QueryList<FlowChildComponent>();
 
   // @ViewChildren('arrowPaths') arrowPaths: QueryList<ElementRef<SVGPathElement>>;
   @ViewChild('zoomContainer') zoomContainer: ElementRef<HTMLDivElement>;
@@ -143,7 +146,9 @@ export class FlowComponent
     public el: ElementRef<HTMLElement>,
     public flow: FlowService,
     private ngZone: NgZone
-  ) {
+  ) {}
+
+  ngOnInit(): void {
     this.flow.zoomContainer = this.el.nativeElement;
     this.flow.arrowsChange.subscribe((e) => this.updateArrows(e));
     this.ngZone.runOutsideAngular(() => {
@@ -166,6 +171,16 @@ export class FlowComponent
 
   ngAfterViewInit(): void {
     this.createArrows();
+    this.runPlugin((e) => e.afterInit?.(this));
+  }
+
+  private runPlugin(callback: (e: FlowPlugin) => void) {
+    for (const key in this.config.Plugins) {
+      if (Object.prototype.hasOwnProperty.call(this.config.Plugins, key)) {
+        const element = this.config.Plugins[key];
+        callback(element);
+      }
+    }
   }
 
   ngAfterContentInit() {
@@ -173,7 +188,7 @@ export class FlowComponent
       .pipe(startWith(this.children))
       .subscribe((children) => {
         this.flow.update(this.children.map((x) => x.position));
-        this.arrangeChildren();
+        this.runPlugin((e) => e.beforeArrowUpdate?.(this));
         this.createArrows();
       });
     requestAnimationFrame(() => this.updateArrows()); // this required for angular to render the dot
@@ -189,7 +204,7 @@ export class FlowComponent
 
   updateDirection(direction: FlowDirection) {
     this.flow.direction = direction;
-    this.arrangeChildren();
+    this.runPlugin((e) => e.beforeArrowUpdate?.(this));
     this.createArrows();
   }
 
@@ -281,36 +296,8 @@ export class FlowComponent
     return { scale: newScale, panX: newPanX, panY: newPanY };
   }
 
-  fitToWindow() {
-    const ftw = new FitToWindow(
-      this.list,
-      this.zoomContainer.nativeElement.getBoundingClientRect(),
-      this.flow.scale,
-      this.flow.panX,
-      this.flow.panY
-    );
-    const { scale, panX, panY } = ftw.fitToWindow();
-    this.flow.scale = scale;
-    this.flow.panX = panX;
-    this.flow.panY = panY;
-    this.updateZoomContainer();
-  }
-
-  private updateZoomContainer() {
+  updateZoomContainer() {
     this.zoomContainer.nativeElement.style.transform = `translate3d(${this.flow.panX}px, ${this.flow.panY}px, 0) scale(${this.flow.scale})`;
-  }
-
-  arrangeChildren() {
-    const arrangements = new Arrangements(
-      this.list,
-      this.flow.direction,
-      this.flow.horizontalPadding,
-      this.flow.verticalPadding,
-      this.flow.groupPadding
-    );
-    const newList = arrangements.autoArrange();
-    this.flow.update([...newList.values()]);
-    this.flow.layoutUpdated.next();
   }
 
   get list() {

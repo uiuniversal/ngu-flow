@@ -5,10 +5,19 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
-import { FlowComponent, FlowChildComponent, FlowOptions } from '@ngu/flow';
+import {
+  FlowComponent,
+  FlowChildComponent,
+  FlowOptions,
+  FlowConfig,
+  FitToWindow,
+  ScrollIntoView,
+  Arrangements,
+} from '@ngu/flow';
 import { EditorComponent } from '../editor.component';
 import { ToolbarComponent } from './toolbar.component';
 import { DemoService } from './demo.service';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-demo-one',
@@ -19,11 +28,25 @@ import { DemoService } from './demo.service';
     FlowChildComponent,
     EditorComponent,
     ToolbarComponent,
+    ReactiveFormsModule,
   ],
   template: `
     <div class="flex flex-col items-center justify-center h-[700px]">
-      <app-toolbar class="block p-3"></app-toolbar>
-      <ngu-flow class="max-w-[90%] max-h-[90%] border bg-gray-100">
+      <app-toolbar
+        class="block p-3"
+        (fitToWindow)="fitToWindow()"
+        (autoArrange)="autoArrange()"
+      ></app-toolbar>
+      <select [formControl]="selectedNode">
+        <label>Select node</label>
+        @for (item of list; track item.id; ) {
+        <option [value]="item.id">{{ item.id }}</option>
+        }
+      </select>
+      <ngu-flow
+        class="max-w-[90%] max-h-[90%] border bg-gray-100"
+        [config]="config"
+      >
         @for (item of list; track item.id; let i = $index) {
         <div
           class="card flex items-center justify-center w-[250px] h-[60px] bg-white"
@@ -63,13 +86,40 @@ export class DemoOneComponent implements AfterViewInit {
   linkingFrom: number | null = null; // Store the index of the node that we start linking from
   @ViewChild(FlowComponent) flowComponent: FlowComponent;
   demoService = inject(DemoService);
+  plugins = {
+    scroll: new ScrollIntoView('1'),
+    fitWindow: new FitToWindow(true),
+    arrange: new Arrangements(),
+  };
+  config: FlowConfig = {
+    Arrows: true,
+    ArrowSize: 20,
+    Plugins: this.plugins,
+  };
+
+  selectedNode = new FormControl<string>('11', { nonNullable: true });
 
   constructor() {
     this.list = structuredClone(FLOW_LIST);
+    this.selectedNode.valueChanges.subscribe((id) => {
+      this.plugins.scroll.focus(id);
+    });
+
+    // setTimeout(() => {
+    //   this.flowComponent.scrollIntoView('3');
+    // });
   }
 
   ngAfterViewInit(): void {
     this.demoService.flow = this.flowComponent;
+  }
+
+  fitToWindow() {
+    this.plugins.fitWindow.fitToWindow();
+  }
+
+  autoArrange() {
+    this.plugins.arrange.arrange();
   }
 
   deleteNode(id: string) {

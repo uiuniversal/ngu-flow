@@ -1,5 +1,6 @@
-import { Arrangements, Arrangements2 } from './arrangements';
-import { ChildInfo } from './flow-interface';
+import { ArrangementsOld, Arrangements } from './arrangements';
+import { ChildInfo } from '../flow-interface';
+import { FlowComponent } from '../flow.component';
 
 export const FLOW_LIST = [
   { x: 40, y: 40, id: '1', deps: [] },
@@ -13,7 +14,7 @@ export const FLOW_LIST = [
 ];
 
 describe('Arrangements', () => {
-  let arrangements: Arrangements;
+  let arrangements: ArrangementsOld;
 
   it('should be created', () => {
     const childObj: ChildInfo[] = FLOW_LIST.map((x) => ({
@@ -21,7 +22,7 @@ describe('Arrangements', () => {
       elRect: { width: 200, height: 200 } as any,
     }));
 
-    arrangements = new Arrangements(childObj);
+    arrangements = new ArrangementsOld(childObj);
     arrangements.verticalPadding = 20;
     arrangements.groupPadding = 100;
     const expected = {
@@ -40,7 +41,7 @@ describe('Arrangements', () => {
 });
 
 describe('Arrangements2', () => {
-  let arrangements: Arrangements2;
+  let arrangements: Arrangements;
 
   it('should be created', () => {
     const childObj: ChildInfo[] = FLOW_LIST.map((x) => ({
@@ -48,9 +49,15 @@ describe('Arrangements2', () => {
       elRect: { width: 200, height: 200 } as any,
     }));
 
-    arrangements = new Arrangements2(childObj);
-    arrangements.verticalPadding = 20;
-    arrangements.groupPadding = 100;
+    arrangements = new Arrangements();
+    arrangements.onInit({
+      list: childObj,
+      flow: {
+        direction: 'vertical',
+        verticalPadding: 20,
+        groupPadding: 100,
+      },
+    } as Partial<FlowComponent> as any);
     const expected = {
       '1': { x: 330, y: 0, id: '1', deps: [] },
       '2': { x: 110, y: 300, id: '2', deps: ['1'] },
@@ -61,7 +68,7 @@ describe('Arrangements2', () => {
       '7': { x: 660, y: 600, id: '7', deps: ['5'] },
       '8': { x: 660, y: 900, id: '8', deps: ['6', '7'] },
     };
-    const actual = Object.fromEntries(arrangements.autoArrange());
+    const actual = Object.fromEntries(arrangements._autoArrange());
     expect(actual).toEqual(expected);
   });
 });

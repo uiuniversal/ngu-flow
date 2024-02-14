@@ -1,3 +1,5 @@
+import { FlowComponent } from './flow.component';
+
 export interface ChildInfo {
   position: FlowOptions;
   dots?: DOMRect[];
@@ -26,6 +28,7 @@ export interface DotOptions extends FlowOptions {
 export class FlowConfig {
   Arrows = true;
   ArrowSize = 20;
+  Plugins: { [x: string]: FlowPlugin } = {};
 }
 
 export type FlowDirection = 'horizontal' | 'vertical';
@@ -36,3 +39,9 @@ export type ArrowPathFn = (
   arrowSize: number,
   strokeWidth: number
 ) => string;
+
+export interface FlowPlugin {
+  onInit?(data: FlowComponent): void;
+  afterInit?(data: FlowComponent): void;
+  beforeArrowUpdate?(data: FlowComponent): void;
+}

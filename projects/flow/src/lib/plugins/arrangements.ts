@@ -1,6 +1,12 @@
-import { FlowOptions, ChildInfo, FlowDirection } from './flow-interface';
+import {
+  FlowOptions,
+  ChildInfo,
+  FlowDirection,
+  FlowPlugin,
+} from '../flow-interface';
+import { FlowComponent } from '../flow.component';
 
-export class Arrangements {
+export class ArrangementsOld {
   constructor(
     private list: ChildInfo[],
     private direction: 'horizontal' | 'vertical' = 'horizontal',
@@ -122,16 +128,44 @@ const ROOT_DEPS = new Map<string, string[]>();
 const HORIZONTAL_PADDING = 100;
 const VERTICAL_PADDING = 20;
 
-export class Arrangements2 {
+export class Arrangements implements FlowPlugin {
   root: string[] = [];
+  data: FlowComponent;
+  private list: ChildInfo[];
+  private direction: FlowDirection = 'vertical';
+  public horizontalPadding = 100;
+  public verticalPadding = 20;
+  public groupPadding = 20;
 
-  constructor(
-    private list: ChildInfo[],
-    private direction: FlowDirection = 'vertical',
-    public horizontalPadding = 100,
-    public verticalPadding = 20,
-    public groupPadding = 20
-  ) {
+  constructor() {}
+
+  onInit(data: FlowComponent): void {
+    this.data = data;
+  }
+
+  beforeArrowUpdate(data: FlowComponent): void {
+    this.data = data;
+    this.runArrange();
+  }
+
+  private runArrange() {
+    const newList = this._autoArrange();
+    this.data.flow.update([...newList.values()]);
+    this.data.flow.layoutUpdated.next();
+  }
+
+  arrange() {
+    this.runArrange();
+    this.data.updateArrows();
+  }
+
+  public _autoArrange(): Map<string, FlowOptions> {
+    this.list = this.data.list;
+    this.direction = this.data.flow.direction;
+    this.horizontalPadding = this.data.flow.horizontalPadding;
+    this.verticalPadding = this.data.flow.verticalPadding;
+    this.groupPadding = this.data.flow.groupPadding;
+
     ROOT_DATA.clear();
     ROOT_DEPS.clear();
     this.list.forEach((item) => {
@@ -149,9 +183,7 @@ export class Arrangements2 {
         this.root.push(item.position.id);
       }
     });
-  }
 
-  public autoArrange(): Map<string, FlowOptions> {
     this.root.forEach((id) => {
       const node = ROOT_DATA.get(id)!;
       node.arrange(0, 0, this.direction);
@@ -162,6 +194,7 @@ export class Arrangements2 {
     for (const item of this.list) {
       newItems.set(item.position.id, item.position);
     }
+    console.log([...newItems.values()]);
     return newItems;
   }
 }

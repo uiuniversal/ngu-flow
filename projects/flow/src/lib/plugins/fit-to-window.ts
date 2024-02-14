@@ -1,17 +1,56 @@
-import { ChildInfo } from './flow-interface';
+import { ChildInfo, FlowPlugin } from '../flow-interface';
+import { FlowComponent } from '../flow.component';
 
-export class FitToWindow {
-  cRect: CPosition;
-  containerPadding = 0;
+export class FitToWindow implements FlowPlugin {
+  private cRect: CPosition;
+  private containerPadding = 0;
+  private data: FlowComponent;
 
-  constructor(
-    private list: ChildInfo[],
-    private containerRect: DOMRect,
-    private scale: number,
-    private panX: number,
-    private panY: number
+  private list: ChildInfo[];
+  private containerRect: DOMRect;
+  private scale: number;
+  private panX: number;
+  private panY: number;
+
+  constructor(private init = false) {}
+
+  onInit(data: FlowComponent): void {
+    this.data = data;
+  }
+
+  afterInit(data: FlowComponent): void {
+    this.data = data;
+    if (this.init) {
+      this.fitToWindow();
+    }
+  }
+
+  fitToWindow() {
+    this.run(
+      this.data.list,
+      this.data.zoomContainer.nativeElement.getBoundingClientRect(),
+      this.data.flow.scale,
+      this.data.flow.panX,
+      this.data.flow.panY
+    );
+  }
+
+  run(
+    list: ChildInfo[],
+    cRect: DOMRect,
+    scale: number,
+    panX: number,
+    panY: number
   ) {
-    const tt = { list, containerRect, scale, panX, panY };
+    this.list = list;
+    this.containerRect = cRect;
+    this.scale = scale;
+    this.panX = panX;
+    this.panY = panY;
+    this._fitToWindowInternal();
+  }
+
+  private _fitToWindowInternal() {
     this.containerPadding = 30 / this.scale;
     this.cRect = {
       x: this.containerRect.x / this.scale - this.panX,
@@ -19,15 +58,20 @@ export class FitToWindow {
       width: this.containerRect.width / this.scale,
       height: this.containerRect.height / this.scale,
     };
+    const { scale, panX, panY } = this._updateValue();
+    this.data.flow.scale = scale;
+    this.data.flow.panX = panX;
+    this.data.flow.panY = panY;
+    this.data.updateZoomContainer();
   }
 
-  fitToWindow() {
-    const positions = this.getPositions();
-    const { minX, maxX, minY, maxY } = this.getBoundaries(positions);
+  _updateValue() {
+    const positions = this._getPositions();
+    const { minX, maxX, minY, maxY } = this._getBoundaries(positions);
     const adjMaxX = maxX - minX + this.containerPadding;
     const adjMaxY = maxY - minY + this.containerPadding;
-    const newScale = this.getNewScale(adjMaxX, adjMaxY);
-    const { panX, panY } = this.getPanValues(
+    const newScale = this._getNewScale(adjMaxX, adjMaxY);
+    const { panX, panY } = this._getPanValues(
       adjMaxX,
       adjMaxY,
       newScale,
@@ -37,7 +81,7 @@ export class FitToWindow {
     return { scale: newScale, panX, panY };
   }
 
-  getPositions() {
+  _getPositions() {
     return this.list.map((child) => {
       const scaledX = child.elRect.x / this.scale - this.panX;
       const scaledY = child.elRect.y / this.scale - this.panY;
@@ -52,7 +96,7 @@ export class FitToWindow {
     });
   }
 
-  getBoundaries(positions: CPosition[]) {
+  _getBoundaries(positions: CPosition[]) {
     const minX = Math.min(...positions.map((p) => p.x));
     const maxX = Math.max(...positions.map((p) => p.x + p.width));
     const minY = Math.min(...positions.map((p) => p.y));
@@ -60,31 +104,13 @@ export class FitToWindow {
     return { minX, maxX, minY, maxY };
   }
 
-  getNewScale(adjMaxX: number, adjMaxY: number) {
+  _getNewScale(adjMaxX: number, adjMaxY: number) {
     const scaleX = this.cRect.width / adjMaxX;
     const scaleY = this.cRect.height / adjMaxY;
     return Math.min(scaleX, scaleY);
   }
 
-  //   getPanValues(
-  //     adjMaxX: number,
-  //     adjMaxY: number,
-  //     newScale: number,
-  //     minX: number,
-  //     minY: number
-  //   ) {
-  //     const panX =
-  //       this.cRect.x +
-  //       (this.cRect.width - (adjMaxX - this.containerPadding) * newScale) / 2 -
-  //       minX * newScale;
-  //     const panY =
-  //       this.cRect.y +
-  //       (this.cRect.height - (adjMaxY - this.containerPadding) * newScale) / 2 -
-  //       minY * newScale;
-  //     return { panX, panY };
-  //   }
-  // }
-  getPanValues(
+  _getPanValues(
     adjMaxX: number,
     adjMaxY: number,
     newScale: number,
