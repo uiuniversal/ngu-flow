@@ -1,4 +1,4 @@
-import { ArrangementsOld, Arrangements } from './arrangements';
+import { Arrangements } from './arrangements';
 import { ChildInfo } from '../flow-interface';
 import { FlowComponent } from '../flow.component';
 
@@ -14,33 +14,6 @@ export const FLOW_LIST = [
 ];
 
 describe('Arrangements', () => {
-  let arrangements: ArrangementsOld;
-
-  it('should be created', () => {
-    const childObj: ChildInfo[] = FLOW_LIST.map((x) => ({
-      position: x,
-      elRect: { width: 200, height: 200 } as any,
-    }));
-
-    arrangements = new ArrangementsOld(childObj);
-    arrangements.verticalPadding = 20;
-    arrangements.groupPadding = 100;
-    const expected = {
-      '1': { x: 0, y: 370, id: '1', deps: [] },
-      '2': { x: 300, y: 110, id: '2', deps: ['1'] },
-      '3': { x: 600, y: 0, id: '3', deps: ['2'] },
-      '4': { x: 600, y: 220, id: '4', deps: ['2'] },
-      '5': { x: 300, y: 630, id: '5', deps: ['1'] },
-      '6': { x: 600, y: 520, id: '6', deps: ['5'] },
-      '7': { x: 600, y: 740, id: '7', deps: ['5'] },
-      '8': { x: 900, y: 550, id: '8', deps: ['6', '7'] },
-    };
-    const actual = Object.fromEntries(arrangements.autoArrange());
-    expect(actual).toEqual(expected);
-  });
-});
-
-describe('Arrangements2', () => {
   let arrangements: Arrangements;
 
   it('should be created', () => {

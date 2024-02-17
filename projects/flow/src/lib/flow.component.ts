@@ -20,12 +20,9 @@ import {
   FlowOptions,
   ChildInfo,
   FlowDirection,
-  DotOptions,
   ArrowPathFn,
-  FlowConfig,
-  FlowPlugin,
 } from './flow-interface';
-import { blendCorners, flowPath, bezierPath, blendCorners1 } from './svg';
+import { FlowConfig, FlowPlugin } from './plugins/plugin';
 
 const BASE_SCALE_AMOUNT = 0.05;
 

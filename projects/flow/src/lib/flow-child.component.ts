@@ -95,8 +95,6 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
     });
 
     this.positionChange.subscribe((x) => {
-      // const { left, top } = this.flow.zRect;
-      // if (!this.position) console.log(this.position);
       this.updatePosition(this.position.x, this.position.y);
     });
   }

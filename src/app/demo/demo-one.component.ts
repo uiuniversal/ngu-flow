@@ -106,10 +106,6 @@ export class DemoOneComponent implements AfterViewInit {
     this.selectedNode.valueChanges.subscribe((id) => {
       this.plugins.scroll.focus(id);
     });
-
-    // setTimeout(() => {
-    //   this.flowComponent.scrollIntoView('3');
-    // });
   }
 
   ngAfterViewInit(): void {

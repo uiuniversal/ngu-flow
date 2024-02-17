@@ -1,5 +1,5 @@
-import { FlowPlugin } from '../flow-interface';
 import { FlowComponent } from '../flow.component';
+import { FlowPlugin } from './plugin';
 
 export class ScrollIntoView implements FlowPlugin {
   private data: FlowComponent;
@@ -16,7 +16,6 @@ export class ScrollIntoView implements FlowPlugin {
     if (item) {
       const { x, y } = item.position;
       const { width, height } = item.elRect;
-      // this.flow.panX = -x * this.flow.scale + this.flow.zRect.width / 2;
       if (x + width * this.data.flow.scale > this.data.flow.zRect.width) {
         this.data.flow.panX =
           -x * this.data.flow.scale + (this.data.flow.zRect.width - width);

@@ -1,5 +1,6 @@
-import { ChildInfo, FlowPlugin } from '../flow-interface';
+import { ChildInfo } from '../flow-interface';
 import { FlowComponent } from '../flow.component';
+import { FlowPlugin } from './plugin';
 
 export class FitToWindow implements FlowPlugin {
   private cRect: CPosition;

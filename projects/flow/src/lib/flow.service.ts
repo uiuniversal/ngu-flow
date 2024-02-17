@@ -1,12 +1,8 @@
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
-import {
-  ArrowPathFn,
-  FlowConfig,
-  FlowDirection,
-  FlowOptions,
-} from './flow-interface';
+import { ArrowPathFn, FlowDirection, FlowOptions } from './flow-interface';
 import { blendCorners } from './svg';
+import { FlowConfig } from './plugins/plugin';
 
 @Injectable()
 export class FlowService {

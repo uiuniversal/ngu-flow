@@ -1,11 +1,7 @@
-import {
-  ChildInfo,
-  DotOptions,
-  FlowOptions,
-  FlowPlugin,
-} from '../flow-interface';
+import { ChildInfo, DotOptions, FlowOptions } from '../flow-interface';
 import { FlowChildComponent } from '../flow-child.component';
 import { FlowComponent } from '../flow.component';
+import { FlowPlugin } from './plugin';
 
 export class Connections implements FlowPlugin {
   // key = id of the item
@@ -134,7 +130,6 @@ export class Connections implements FlowPlugin {
     child: ChildInfo
   ): [number, number] {
     // sides dot index order: [top, right, bottom, left]
-    const thresholdDistance = 10; // Example distance threshold. Adjust as needed.
     let swapped = false;
     const isV = this.direction === 'vertical';
     // correct the parent based on the deps
@@ -145,25 +140,7 @@ export class Connections implements FlowPlugin {
       swapped = true;
     }
 
-    const childDirection: 'right' | 'left' | 'bottom' | 'top' = (() => {
-      // consider width and height of the child
-      const { width, height } = child.elRect;
-      const { x, y } = child.position;
-      const { x: px, y: py } = parent.position;
-
-      if (!isV) {
-        if (x + width < px) return 'left';
-        if (x - width > px) return 'right';
-        if (y + height < py) return 'top';
-        if (y - height > py) return 'bottom';
-      } else {
-        if (y + height < py) return 'top';
-        if (y - height > py) return 'bottom';
-        if (x + width < px) return 'left';
-        if (x - width > px) return 'right';
-      }
-      return 'right';
-    })();
+    const childDirection = this.getDirection(child, parent, isV);
 
     const parentIndex = (() => {
       if (childDirection === 'right') return 1;
@@ -178,20 +155,36 @@ export class Connections implements FlowPlugin {
       return 2;
     })();
 
-    // console.log(
-    //   `parentIndex ${parent.position.id}-${child.position.id}:`,
-    //   `${parent.position.id}-${parentIndex}`,
-    //   `${child.position.id}-${childIndex}`,
-    //   [structuredClone(parent), structuredClone(child)]
-    // );
-
     return swapped ? [childIndex, parentIndex] : [parentIndex, childIndex];
+  }
+
+  private getDirection(
+    child: ChildInfo,
+    parent: ChildInfo,
+    isV: boolean
+  ): 'right' | 'left' | 'bottom' | 'top' {
+    // consider width and height of the child
+    const { width, height } = child.elRect;
+    const { x, y } = child.position;
+    const { x: px, y: py } = parent.position;
+
+    if (!isV) {
+      if (x + width < px) return 'left';
+      if (x - width > px) return 'right';
+      if (y + height < py) return 'top';
+      if (y - height > py) return 'bottom';
+    } else {
+      if (y + height < py) return 'top';
+      if (y - height > py) return 'bottom';
+      if (x + width < px) return 'left';
+      if (x - width > px) return 'right';
+    }
+    return 'right';
   }
 
   private updateDotVisibility(childObj: Record<string, FlowChildComponent>) {
     Object.keys(childObj).forEach((id) => {
       const child = childObj[id];
-      const position = child.position;
       const dots = child.dots.toArray();
 
       dots.forEach((dot, index) => {
@@ -203,7 +196,6 @@ export class Connections implements FlowPlugin {
         dot.nativeElement.style.visibility = isClosestForAnyDep
           ? 'visible'
           : 'hidden';
-        // dot.nativeElement.style.visibility = 'hidden';
       });
     });
   }
@@ -225,7 +217,6 @@ export class Connections implements FlowPlugin {
 
     const rect = childDots[dotIndex];
     const { left, top } = this.data.flow.zRect;
-    // const rect = dotEl.nativeElement.getBoundingClientRect();
     const x = (rect.x + rect.width / 2 - panX - left) / scale;
     const y = (rect.y + rect.height / 2 - panY - top) / scale;
 
