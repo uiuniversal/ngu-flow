@@ -143,7 +143,7 @@ export class Arrangements implements FlowPlugin {
     this.data = data;
   }
 
-  beforeArrowUpdate(data: FlowComponent): void {
+  beforeUpdate(data: FlowComponent): void {
     this.data = data;
     this.runArrange();
   }

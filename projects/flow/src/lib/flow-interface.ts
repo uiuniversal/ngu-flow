@@ -43,5 +43,6 @@ export type ArrowPathFn = (
 export interface FlowPlugin {
   onInit?(data: FlowComponent): void;
   afterInit?(data: FlowComponent): void;
-  beforeArrowUpdate?(data: FlowComponent): void;
+  beforeUpdate?(data: FlowComponent): void;
+  afterUpdate?(data: FlowComponent): void;
 }

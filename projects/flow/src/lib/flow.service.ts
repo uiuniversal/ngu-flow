@@ -1,6 +1,5 @@
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
-import { Connections } from './connections';
 import {
   ArrowPathFn,
   FlowConfig,
@@ -29,7 +28,6 @@ export class FlowService {
   gridSize = 1;
   arrows: Arrow[] = [];
   zoomContainer: HTMLElement;
-  connections: Connections;
   layoutUpdated = new Subject<void>();
   onMouse = new Subject<MouseEvent>();
 

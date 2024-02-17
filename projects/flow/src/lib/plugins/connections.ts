@@ -1,7 +1,13 @@
-import { ChildInfo, FlowOptions } from './flow-interface';
-import { FlowChildComponent } from './flow-child.component';
+import {
+  ChildInfo,
+  DotOptions,
+  FlowOptions,
+  FlowPlugin,
+} from '../flow-interface';
+import { FlowChildComponent } from '../flow-child.component';
+import { FlowComponent } from '../flow.component';
 
-export class Connections {
+export class Connections implements FlowPlugin {
   // key = id of the item
   // value = ids of the items that depend on it
   reverseDepsMap = new Map<string, string[]>();
@@ -10,12 +16,75 @@ export class Connections {
   // value = index of the closest dot
   closestDots = new Map<string, number>();
 
-  constructor(
-    private list: ChildInfo[],
-    private direction: 'horizontal' | 'vertical' = 'horizontal'
-  ) {
-    this.setReverseDepsMap(list.map((x) => x.position));
-    // console.count('Connections');
+  data: FlowComponent;
+  private list: ChildInfo[];
+  private direction: 'horizontal' | 'vertical' = 'horizontal';
+
+  onInit(data: FlowComponent): void {
+    this.setData(data);
+  }
+
+  afterUpdate(data: FlowComponent): void {
+    this.setData(data);
+
+    const gElement: SVGGElement = this.data.g.nativeElement;
+    const childObj = this.data.getChildInfo();
+    // Calculate new arrows
+    this.data.flow.arrows.forEach((arrow) => {
+      const [from, to] = arrow.deps;
+      const fromItem = childObj[from];
+      const toItem = childObj[to];
+      if (fromItem && toItem) {
+        const [endDotIndex, startDotIndex] = this.getClosestDotsSimplified(
+          toItem,
+          from
+        );
+
+        const startDot = this.getDotByIndex(
+          childObj,
+          fromItem.position,
+          startDotIndex,
+          this.data.flow.scale,
+          this.data.flow.panX,
+          this.data.flow.panY
+        );
+        const endDot = this.getDotByIndex(
+          childObj,
+          toItem.position,
+          endDotIndex,
+          this.data.flow.scale,
+          this.data.flow.panX,
+          this.data.flow.panY
+        );
+
+        // we need to reverse the path because the arrow head is at the end
+        arrow.d = this.data.flow.arrowFn(
+          endDot,
+          startDot,
+          this.data.flow.config.ArrowSize,
+          2
+        );
+      }
+
+      // Update the SVG paths
+      this.data.flow.arrows.forEach((arrow) => {
+        const pathElement = gElement.querySelector(
+          `#${arrow.id}`
+        ) as SVGPathElement;
+        if (pathElement) {
+          pathElement.setAttribute('d', arrow.d);
+        }
+      });
+    });
+
+    this.updateDotVisibility(this.data.oldChildObj());
+  }
+
+  private setData(data: FlowComponent) {
+    this.data = data;
+    this.list = data.list;
+    this.direction = data.flow.direction;
+    this.setReverseDepsMap(this.list.map((x) => x.position));
   }
 
   public getClosestDotsSimplified(
@@ -28,13 +97,6 @@ export class Connections {
     ];
     ids.forEach((x) => this.findClosestDot(x, item));
     // ids.forEach((x) => this.findClosestDot(x, item, childObj));
-
-    // Create unique keys for each dependency and retrieve the closest dots based on these keys
-    const closestDotIndices = ids.map((x) => {
-      const uniqueKey = `${item.position.id}-${x}`;
-      return this.closestDots.get(uniqueKey) as number;
-    });
-
     // Remove duplicates
     // const uniqueClosestDotIndices = Array.from(new Set(closestDotIndices));
 
@@ -65,12 +127,6 @@ export class Connections {
       this.closestDots.set(uniqueKey1, closestDotIndex1);
       this.closestDots.set(uniqueKey2, closestDotIndex2);
     }
-  }
-
-  private computeDistance(dot1: DOMRect, dot2: DOMRect): number {
-    const dx = dot1.x - dot2.x;
-    const dy = dot1.y - dot2.y;
-    return Math.sqrt(dx * dx + dy * dy);
   }
 
   public _findClosestConnectionPoints(
@@ -132,7 +188,7 @@ export class Connections {
     return swapped ? [childIndex, parentIndex] : [parentIndex, childIndex];
   }
 
-  updateDotVisibility(childObj: Record<string, FlowChildComponent>) {
+  private updateDotVisibility(childObj: Record<string, FlowChildComponent>) {
     Object.keys(childObj).forEach((id) => {
       const child = childObj[id];
       const position = child.position;
@@ -150,6 +206,30 @@ export class Connections {
         // dot.nativeElement.style.visibility = 'hidden';
       });
     });
+  }
+
+  private getDotByIndex(
+    childObj: Record<string, ChildInfo>,
+    item: FlowOptions,
+    dotIndex: number,
+    scale: number,
+    panX: number,
+    panY: number
+  ): DotOptions {
+    const child = childObj[item.id];
+    const childDots = child.dots as DOMRect[];
+    // Make sure the dot index is within bounds
+    if (dotIndex < 0 || dotIndex >= childDots.length) {
+      throw new Error(`Invalid dot index: ${dotIndex}`);
+    }
+
+    const rect = childDots[dotIndex];
+    const { left, top } = this.data.flow.zRect;
+    // const rect = dotEl.nativeElement.getBoundingClientRect();
+    const x = (rect.x + rect.width / 2 - panX - left) / scale;
+    const y = (rect.y + rect.height / 2 - panY - top) / scale;
+
+    return { ...item, x, y, dotIndex };
   }
 
   private setReverseDepsMap(list: FlowOptions[]) {

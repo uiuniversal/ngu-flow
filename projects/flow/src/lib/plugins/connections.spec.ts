@@ -1,4 +1,4 @@
-import { FlowOptions, ChildInfo } from './flow-interface';
+import { FlowOptions, ChildInfo } from '../flow-interface';
 import { Connections } from './connections';
 
 describe('Connections', () => {
@@ -36,7 +36,8 @@ describe('Connections', () => {
     check(list, [0, 2]);
 
     function check(list: ChildInfo[], expected: [number, number]) {
-      connections = new Connections(list);
+      connections = new Connections();
+      connections.onInit({ list, flow: { direction: 'horizontal' } } as any);
       const actual = connections._findClosestConnectionPoints(list[0], list[1]);
       expect(actual).toEqual(expected);
     }
@@ -80,7 +81,8 @@ describe('Connections', () => {
       dep: string,
       expected: [number, number]
     ) {
-      connections = new Connections(list);
+      connections = new Connections();
+      connections.onInit({ list, flow: { direction: 'horizontal' } } as any);
       const actual = connections.getClosestDotsSimplified(list[index], dep);
       expect(actual).toEqual(expected);
     }

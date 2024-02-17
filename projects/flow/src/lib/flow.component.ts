@@ -14,7 +14,6 @@ import {
   OnInit,
 } from '@angular/core';
 import { startWith } from 'rxjs';
-import { Connections } from './connections';
 import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
 import {
@@ -188,7 +187,7 @@ export class FlowComponent
       .pipe(startWith(this.children))
       .subscribe((children) => {
         this.flow.update(this.children.map((x) => x.position));
-        this.runPlugin((e) => e.beforeArrowUpdate?.(this));
+        this.runPlugin((e) => e.beforeUpdate?.(this));
         this.createArrows();
       });
     requestAnimationFrame(() => this.updateArrows()); // this required for angular to render the dot
@@ -204,7 +203,7 @@ export class FlowComponent
 
   updateDirection(direction: FlowDirection) {
     this.flow.direction = direction;
-    this.runPlugin((e) => e.beforeArrowUpdate?.(this));
+    this.runPlugin((e) => e.beforeUpdate?.(this));
     this.createArrows();
   }
 
@@ -384,99 +383,25 @@ export class FlowComponent
   }
 
   updateArrows(e?: FlowOptions) {
-    const gElement: SVGGElement = this.g.nativeElement;
-    const childObj = this.getChildInfo();
+    this.runPlugin((e) => e.afterUpdate?.(this));
+    // const gElement: SVGGElement = this.g.nativeElement;
+    // const childObj = this.getChildInfo();
     // Handle reverse dependencies
-    this.flow.connections = new Connections(this.list, this.flow.direction);
-
-    // Calculate new arrows
-    this.flow.arrows.forEach((arrow) => {
-      const [from, to] = arrow.deps;
-      const fromItem = childObj[from];
-      const toItem = childObj[to];
-      if (fromItem && toItem) {
-        const [endDotIndex, startDotIndex] = this.getClosestDots(toItem, from);
-
-        const startDot = this.getDotByIndex(
-          childObj,
-          fromItem.position,
-          startDotIndex,
-          this.flow.scale,
-          this.flow.panX,
-          this.flow.panY
-        );
-        const endDot = this.getDotByIndex(
-          childObj,
-          toItem.position,
-          endDotIndex,
-          this.flow.scale,
-          this.flow.panX,
-          this.flow.panY
-        );
-
-        // we need to reverse the path because the arrow head is at the end
-        arrow.d = this.flow.arrowFn(
-          endDot,
-          startDot,
-          this.flow.config.ArrowSize,
-          2
-        );
-      }
-
-      // Update the SVG paths
-      this.flow.arrows.forEach((arrow) => {
-        const pathElement = gElement.querySelector(
-          `#${arrow.id}`
-        ) as SVGPathElement;
-        if (pathElement) {
-          pathElement.setAttribute('d', arrow.d);
-        }
-      });
-    });
-
-    this.flow.connections.updateDotVisibility(this.oldChildObj());
+    // this.flow.connections = new Connections(this.list, this.flow.direction);
   }
 
-  private oldChildObj() {
+  oldChildObj() {
     return this.children.toArray().reduce((acc, curr) => {
       acc[curr.position.id] = curr;
       return acc;
     }, {} as Record<string, FlowChildComponent>);
   }
 
-  private getChildInfo() {
+  getChildInfo() {
     return this.list.reduce((acc, curr) => {
       acc[curr.position.id] = curr;
       return acc;
     }, {} as Record<string, ChildInfo>);
-  }
-
-  private getDotByIndex(
-    childObj: Record<string, ChildInfo>,
-    item: FlowOptions,
-    dotIndex: number,
-    scale: number,
-    panX: number,
-    panY: number
-  ): DotOptions {
-    const child = childObj[item.id];
-    const childDots = child.dots as DOMRect[];
-    // Make sure the dot index is within bounds
-    if (dotIndex < 0 || dotIndex >= childDots.length) {
-      throw new Error(`Invalid dot index: ${dotIndex}`);
-    }
-
-    const rect = childDots[dotIndex];
-    const { left, top } = this.flow.zRect;
-    // const rect = dotEl.nativeElement.getBoundingClientRect();
-    const x = (rect.x + rect.width / 2 - panX - left) / scale;
-    const y = (rect.y + rect.height / 2 - panY - top) / scale;
-
-    return { ...item, x, y, dotIndex };
-  }
-
-  public getClosestDots(item: ChildInfo, dep?: string): number[] {
-    return this.flow.connections.getClosestDotsSimplified(item, dep as string);
   }
 
   ngOnDestroy(): void {
