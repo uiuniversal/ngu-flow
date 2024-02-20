@@ -13,7 +13,6 @@ import {
   ScrollIntoView,
   FitToWindow,
   Arrangements,
-  Connections,
 } from '@ngu/flow';
 import { EditorComponent } from '../editor.component';
 import { ToolbarComponent } from './toolbar.component';
@@ -101,7 +100,6 @@ export class DemoTwoComponent implements AfterViewInit {
     scroll: new ScrollIntoView('1'),
     fitWindow: new FitToWindow(false),
     arrange: new Arrangements(),
-    connections: new Connections(),
   };
   config: FlowConfig = {
     Arrows: true,

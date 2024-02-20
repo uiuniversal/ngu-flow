@@ -10,5 +10,4 @@ export * from './lib/svg';
 export { FitToWindow } from './lib/plugins/fit-to-window';
 export { ScrollIntoView } from './lib/plugins/scroll-into-view';
 export { Arrangements } from './lib/plugins/arrangements';
-export { Connections } from './lib/plugins/connections';
 export { FlowConfig, FlowPlugin } from './lib/plugins/plugin';

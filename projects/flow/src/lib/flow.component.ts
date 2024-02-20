@@ -23,6 +23,7 @@ import {
   ArrowPathFn,
 } from './flow-interface';
 import { FlowConfig, FlowPlugin } from './plugins/plugin';
+import { Connections } from './plugins/connections';
 
 const BASE_SCALE_AMOUNT = 0.05;
 
@@ -137,6 +138,7 @@ export class FlowComponent
   @ViewChild('guideLines') guideLines: ElementRef<SVGGElement>;
   initialX = 0;
   initialY = 0;
+  defaultPlugins = [new Connections()];
 
   constructor(
     public el: ElementRef<HTMLElement>,
@@ -171,6 +173,9 @@ export class FlowComponent
   }
 
   private runPlugin(callback: (e: FlowPlugin) => void) {
+    for (const plug of this.defaultPlugins) {
+      callback(plug);
+    }
     for (const key in this.config.Plugins) {
       if (Object.prototype.hasOwnProperty.call(this.config.Plugins, key)) {
         const element = this.config.Plugins[key];
