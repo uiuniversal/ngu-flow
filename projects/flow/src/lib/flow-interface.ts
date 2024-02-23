@@ -23,11 +23,6 @@ export interface DotOptions extends FlowOptions {
   dotIndex: number;
 }
 
-export class FlowConfig {
-  Arrows = true;
-  ArrowSize = 20;
-}
-
 export type FlowDirection = 'horizontal' | 'vertical';
 
 export type ArrowPathFn = (

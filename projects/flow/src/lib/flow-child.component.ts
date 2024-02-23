@@ -95,9 +95,7 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
     });
 
     this.positionChange.subscribe((x) => {
-      const { left, top } = this.flow.zRect;
-      // if (!this.position) console.log(this.position);
-      this.updatePosition(this.position.x + left, this.position.y + top);
+      this.updatePosition(this.position.x, this.position.y);
     });
   }
 
@@ -135,8 +133,8 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
             (this.flow.gridSize * this.flow.scale)
         ) * this.flow.gridSize;
 
-      this.position.x = x - zRect.left;
-      this.position.y = y - zRect.top;
+      this.position.x = x;
+      this.position.y = y;
       this.positionChange.next(this.position);
       this.flow.arrowsChange.next(this.position);
     }

@@ -1,13 +1,8 @@
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
-import { Connections } from './connections';
-import {
-  ArrowPathFn,
-  FlowConfig,
-  FlowDirection,
-  FlowOptions,
-} from './flow-interface';
+import { ArrowPathFn, FlowDirection, FlowOptions } from './flow-interface';
 import { blendCorners } from './svg';
+import { FlowConfig } from './plugins/plugin';
 
 @Injectable()
 export class FlowService {
@@ -29,7 +24,6 @@ export class FlowService {
   gridSize = 1;
   arrows: Arrow[] = [];
   zoomContainer: HTMLElement;
-  connections: Connections;
   layoutUpdated = new Subject<void>();
   onMouse = new Subject<MouseEvent>();
 
@@ -47,7 +41,6 @@ export class FlowService {
   };
 
   update(children: FlowOptions[]) {
-    // console.log('update', children);
     this.items.clear();
     children.forEach((child) => {
       this.items.set(child.id, child);
@@ -60,21 +53,6 @@ export class FlowService {
         this.deps.set(dep, d);
       });
     });
-  }
-
-  // delete(option: FlowOptions) {
-  //   this.items.delete(option.id);
-  //   this.deps.delete(option.id);
-  //   this.deps.forEach((v, k) => {
-  //     const index = v.indexOf(option.id);
-  //     if (index > -1) {
-  //       v.splice(index, 1);
-  //     }
-  //   });
-  // }
-
-  get list() {
-    return Array.from(this.items.values());
   }
 
   get zRect() {

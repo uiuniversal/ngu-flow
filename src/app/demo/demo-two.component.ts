@@ -5,7 +5,15 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
-import { FlowComponent, FlowChildComponent, FlowOptions } from '@ngu/flow';
+import {
+  FlowComponent,
+  FlowChildComponent,
+  FlowOptions,
+  FlowConfig,
+  ScrollIntoView,
+  FitToWindow,
+  Arrangements,
+} from '@ngu/flow';
 import { EditorComponent } from '../editor.component';
 import { ToolbarComponent } from './toolbar.component';
 import { DemoService } from './demo.service';
@@ -22,8 +30,15 @@ import { DemoService } from './demo.service';
   ],
   template: `
     <div class="flex flex-col items-center justify-center h-[700px]">
-      <app-toolbar class="block p-3"></app-toolbar>
-      <ngu-flow class="max-w-[90%] max-h-[90%] border bg-gray-100">
+      <app-toolbar
+        class="block p-3"
+        (fitToWindow)="fitToWindow()"
+        (autoArrange)="autoArrange()"
+      ></app-toolbar>
+      <ngu-flow
+        class="max-w-[90%] max-h-[90%] border bg-gray-100"
+        [config]="config"
+      >
         @for (item of list; track item.id; let i = $index) {
         <div
           class="card flex flex-col w-[250px] bg-white rounded-2xl"
@@ -81,6 +96,16 @@ export class DemoTwoComponent implements AfterViewInit {
   linkingFrom: number | null = null; // Store the index of the node that we start linking from
   @ViewChild(FlowComponent) flowComponent: FlowComponent;
   demoService = inject(DemoService);
+  plugins = {
+    scroll: new ScrollIntoView('1'),
+    fitWindow: new FitToWindow(false),
+    arrange: new Arrangements(),
+  };
+  config: FlowConfig = {
+    Arrows: true,
+    ArrowSize: 20,
+    Plugins: this.plugins,
+  };
 
   constructor() {
     this.list = [
@@ -133,6 +158,14 @@ export class DemoTwoComponent implements AfterViewInit {
 
   ngAfterViewInit(): void {
     this.demoService.flow = this.flowComponent;
+  }
+
+  fitToWindow() {
+    this.plugins.fitWindow.fitToWindow();
+  }
+
+  autoArrange() {
+    this.plugins.arrange.arrange();
   }
 
   deleteNode(id: string) {

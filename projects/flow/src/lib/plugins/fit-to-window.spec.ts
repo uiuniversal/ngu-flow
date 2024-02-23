@@ -80,11 +80,25 @@ describe('FitToWindow', () => {
     scale = 1;
     panX = 0;
     panY = 0;
-    fitToWindow = new FitToWindow(list, containerRect, scale, panX, panY);
+    fitToWindow = new FitToWindow();
+    fitToWindow.onInit({
+      list,
+      zoomContainer: {
+        nativeElement: { getBoundingClientRect: () => containerRect },
+      },
+      flow: {
+        scale,
+        panX,
+        panY,
+        zRect: containerRect,
+      },
+      updateZoomContainer: () => {},
+    } as any);
+    fitToWindow.run(list, containerRect, scale, panX, panY);
   });
 
   it('should return positions', () => {
-    const positions = fitToWindow.getPositions();
+    const positions = fitToWindow._getPositions();
     expect(positions).toEqual([
       { x: 121, y: 342.5, width: 400, height: 395 },
       { x: 621, y: 342.5, width: 400, height: 395 },
@@ -98,7 +112,7 @@ describe('FitToWindow', () => {
       { x: 0, y: 0, width: 100, height: 100 },
       { x: 100, y: 100, width: 100, height: 100 },
     ];
-    const { minX, maxX, minY, maxY } = fitToWindow.getBoundaries(positions);
+    const { minX, maxX, minY, maxY } = fitToWindow._getBoundaries(positions);
     expect(minX).toBe(0);
     expect(maxX).toBe(200);
     expect(minY).toBe(0);
@@ -106,12 +120,12 @@ describe('FitToWindow', () => {
   });
 
   it('should return new scale', () => {
-    const newScale = fitToWindow.getNewScale(100, 100);
+    const newScale = fitToWindow._getNewScale(100, 100);
     expect(newScale).toBe(6.28);
   });
 
   it('should return pan values', () => {
-    const { panX, panY } = fitToWindow.getPanValues(
+    const { panX, panY } = fitToWindow._getPanValues(
       1430,
       840,
       0.7476,
@@ -123,7 +137,7 @@ describe('FitToWindow', () => {
   });
 
   it('should return pan and scale values', () => {
-    const { scale, panX, panY } = fitToWindow.fitToWindow();
+    const { scale, panX, panY } = fitToWindow._updateValue();
     expect(scale).toBe(0.7476190476190476);
     expect(panX).toBe(-29.19047619047616);
     expect(panY).toBe(-38.876190476190494);

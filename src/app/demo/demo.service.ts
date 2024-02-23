@@ -21,14 +21,17 @@ export class DemoService {
   }
 
   deleteNodeI(id: string, list: FlowOptions[]) {
+    let removeId = [id];
     if (id && list.length > 0) {
-      const index = list.findIndex((x) => x.id == id);
-      const deletedNode = list.splice(index, 1)[0];
-      // Remove dependencies of the deleted node
       return list.reduce((acc, item) => {
         const initialLength = item.deps.length;
-        item.deps = item.deps.filter((dep) => dep !== deletedNode.id);
-        if (item.deps.length === initialLength || item.deps.length > 0)
+        item.deps = item.deps.filter((dep) => !removeId.includes(dep));
+        if (initialLength > 0 && item.deps.length === 0) {
+          removeId.push(item.id);
+        } else if (
+          !removeId.includes(item.id) &&
+          (item.deps.length === initialLength || item.deps.length > 0)
+        )
           acc.push(item);
         return acc;
       }, [] as FlowOptions[]);
