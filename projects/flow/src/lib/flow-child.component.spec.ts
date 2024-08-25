@@ -16,7 +16,7 @@ describe('FlowChildComponent', () => {
   beforeEach(() => {
     fixture = TestBed.createComponent(FlowChildComponent);
     component = fixture.componentInstance;
-    component.position = { x: 0, y: 0, id: '1', deps: [] };
+    component.flowChild = { x: 0, y: 0, id: '1', deps: [] };
     fixture.detectChanges();
   });
 

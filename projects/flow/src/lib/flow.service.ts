@@ -25,20 +25,20 @@ export class FlowService {
   arrows: Arrow[] = [];
   zoomContainer: HTMLElement;
   layoutUpdated = new Subject<void>();
-  onMouse = new Subject<MouseEvent>();
+  // onMouse = new Subject<MouseEvent>();
 
   arrowFn: ArrowPathFn = blendCorners;
 
   constructor(private ngZone: NgZone) {
-    this.ngZone.runOutsideAngular(() => {
-      // mouse move event
-      document.addEventListener('mousemove', this.onMouseMove);
-    });
+    // this.ngZone.runOutsideAngular(() => {
+    //   // mouse move event
+    //   document.addEventListener('mousemove', this.onMouseMove);
+    // });
   }
 
-  private onMouseMove = (event: MouseEvent) => {
-    this.onMouse.next(event);
-  };
+  // private onMouseMove = (event: MouseEvent) => {
+  //   this.onMouse.next(event);
+  // };
 
   update(children: FlowOptions[]) {
     this.items.clear();

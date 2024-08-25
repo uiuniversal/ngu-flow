@@ -25,7 +25,7 @@ import {
 import { FlowConfig, FlowPlugin } from './plugins/plugin';
 import { Connections } from './plugins/connections';
 
-const BASE_SCALE_AMOUNT = 0.05;
+const BASE_SCALE_AMOUNT = 0.1;
 
 @Component({
   standalone: true,
@@ -80,8 +80,8 @@ const BASE_SCALE_AMOUNT = 0.05;
     `
       :host {
         --dot-size: 10px;
-        --flow-dot-color: red;
-        --flow-path-color: blue;
+        --flow-dot-color: #1b262c;
+        --flow-path-color: #b1b1b7;
         --grid-size: 20px;
         display: block;
         height: 100%;
@@ -143,7 +143,7 @@ export class FlowComponent
   constructor(
     public el: ElementRef<HTMLElement>,
     public flow: FlowService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
   ) {}
 
   ngOnInit(): void {
@@ -154,15 +154,7 @@ export class FlowComponent
 
       this.el.nativeElement.addEventListener(
         'mousedown',
-        this._startDraggingZoomContainer
-      );
-      this.el.nativeElement.addEventListener(
-        'mouseup',
-        this._stopDraggingZoomContainer
-      );
-      this.el.nativeElement.addEventListener(
-        'mousemove',
-        this._dragZoomContainer
+        this._startDraggingZoomContainer,
       );
     });
   }
@@ -188,7 +180,7 @@ export class FlowComponent
     this.children.changes
       .pipe(startWith(this.children))
       .subscribe((children) => {
-        this.flow.update(this.children.map((x) => x.position));
+        this.flow.update(this.children.map((x) => x.flowChild));
         this.runPlugin((e) => e.beforeUpdate?.(this));
         this.createArrows();
       });
@@ -216,6 +208,15 @@ export class FlowComponent
 
   public _startDraggingZoomContainer = (event: MouseEvent) => {
     event.stopPropagation();
+
+    this.el.nativeElement.addEventListener(
+      'mouseup',
+      this._stopDraggingZoomContainer,
+    );
+    this.el.nativeElement.addEventListener(
+      'mousemove',
+      this._dragZoomContainer,
+    );
     this.flow.isDraggingZoomContainer = true;
     this.initialX = event.clientX - this.flow.panX;
     this.initialY = event.clientY - this.flow.panY;
@@ -223,6 +224,14 @@ export class FlowComponent
 
   public _stopDraggingZoomContainer = (event: MouseEvent) => {
     event.stopPropagation();
+    this.el.nativeElement.removeEventListener(
+      'mouseup',
+      this._stopDraggingZoomContainer,
+    );
+    this.el.nativeElement.removeEventListener(
+      'mousemove',
+      this._dragZoomContainer,
+    );
     this.flow.isDraggingZoomContainer = false;
   };
 
@@ -268,7 +277,7 @@ export class FlowComponent
       scaleDirection,
       this.flow.panX,
       this.flow.panY,
-      this.flow.scale
+      this.flow.scale,
     );
     this.flow.scale = scale;
     this.flow.panX = panX;
@@ -284,7 +293,7 @@ export class FlowComponent
     scaleDirection: number,
     panX: number,
     panY: number,
-    scale: number
+    scale: number,
   ) {
     // Make scaleAmount proportional to the current scale
     const scaleAmount = BASE_SCALE_AMOUNT * scale;
@@ -318,7 +327,7 @@ export class FlowComponent
         height,
       };
       return {
-        position: x.position,
+        position: x.flowChild,
         elRect: newElRect,
         dots: x.dots.map((y) => y.nativeElement.getBoundingClientRect()),
       } as ChildInfo;
@@ -352,7 +361,7 @@ export class FlowComponent
           // Create path element and set attributes
           const pathElement = document.createElementNS(
             'http://www.w3.org/2000/svg',
-            'path'
+            'path',
           );
           pathElement.setAttribute('d', arrow.d);
           pathElement.setAttribute('id', arrow.id);
@@ -393,17 +402,23 @@ export class FlowComponent
   }
 
   oldChildObj() {
-    return this.children.toArray().reduce((acc, curr) => {
-      acc[curr.position.id] = curr;
-      return acc;
-    }, {} as Record<string, FlowChildComponent>);
+    return this.children.toArray().reduce(
+      (acc, curr) => {
+        acc[curr.flowChild.id] = curr;
+        return acc;
+      },
+      {} as Record<string, FlowChildComponent>,
+    );
   }
 
   getChildInfo() {
-    return this.list.reduce((acc, curr) => {
-      acc[curr.position.id] = curr;
-      return acc;
-    }, {} as Record<string, ChildInfo>);
+    return this.list.reduce(
+      (acc, curr) => {
+        acc[curr.position.id] = curr;
+        return acc;
+      },
+      {} as Record<string, ChildInfo>,
+    );
   }
 
   ngOnDestroy(): void {

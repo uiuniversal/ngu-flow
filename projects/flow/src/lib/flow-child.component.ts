@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import {
   Component,
   OnInit,
@@ -11,6 +11,7 @@ import {
   OnChanges,
   SimpleChanges,
   ChangeDetectionStrategy,
+  Inject,
 } from '@angular/core';
 import { Subject, Subscription } from 'rxjs';
 import { FlowService } from './flow.service';
@@ -28,6 +29,9 @@ import { FlowOptions } from './flow-interface';
     <div #dot class="dot dot-left"></div>`,
   styles: [
     `
+      :host:hover .dot {
+        visibility: visible !important;
+      }
       .dot {
         --dot-half-size: calc(var(--dot-size) / 2 * -1);
         position: absolute;
@@ -65,7 +69,7 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
 
   @ViewChildren('dot') dots: QueryList<ElementRef<HTMLDivElement>>;
 
-  @Input('flowChild') position: FlowOptions;
+  @Input() flowChild: FlowOptions;
 
   private positionChange = new Subject<FlowOptions>();
   private mouseMoveSubscription: Subscription;
@@ -74,7 +78,8 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
   constructor(
     public el: ElementRef<HTMLDivElement>,
     private flow: FlowService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    @Inject(DOCUMENT) private document: Document,
   ) {
     this.el.nativeElement.style.position = 'absolute';
     this.el.nativeElement.style.transformOrigin = '0, 0';
@@ -90,17 +95,21 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
     });
 
     this.layoutSubscribe = this.flow.layoutUpdated.subscribe((x) => {
-      this.position = this.flow.items.get(this.position.id) as FlowOptions;
-      this.positionChange.next(this.position);
+      this.flowChild = this.flow.items.get(this.flowChild.id) as FlowOptions;
+      this.positionChange.next(this.flowChild);
     });
 
     this.positionChange.subscribe((x) => {
-      this.updatePosition(this.position.x, this.position.y);
+      this.updatePosition(this.flowChild.x, this.flowChild.y);
     });
   }
 
   private onMouseUp = (event: MouseEvent) => {
     event.stopPropagation();
+    this.document.removeEventListener('mousemove', this.onMouseMove);
+    this.el.nativeElement.removeEventListener('mouseup', this.onMouseUp);
+    this.toggleUserSelect(false);
+    console.log('onMouseUp');
     this.isDragging = false;
     this.flow.isChildDragging = false;
   };
@@ -112,6 +121,9 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
     const rect = this.el.nativeElement.getBoundingClientRect();
     this.offsetX = event.clientX - rect.x;
     this.offsetY = event.clientY - rect.y;
+    this.document.addEventListener('mousemove', this.onMouseMove);
+    this.document.addEventListener('mouseup', this.onMouseUp);
+    this.toggleUserSelect(true);
   };
 
   private onMouseMove = (event: MouseEvent) => {
@@ -125,35 +137,39 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
       const x =
         Math.round(
           (cx - this.flow.panX - this.offsetX) /
-            (this.flow.gridSize * this.flow.scale)
+            (this.flow.gridSize * this.flow.scale),
         ) * this.flow.gridSize;
       const y =
         Math.round(
           (cy - this.flow.panY - this.offsetY) /
-            (this.flow.gridSize * this.flow.scale)
+            (this.flow.gridSize * this.flow.scale),
         ) * this.flow.gridSize;
 
-      this.position.x = x;
-      this.position.y = y;
-      this.positionChange.next(this.position);
-      this.flow.arrowsChange.next(this.position);
+      this.flowChild.x = x;
+      this.flowChild.y = y;
+      this.positionChange.next(this.flowChild);
+      this.flow.arrowsChange.next(this.flowChild);
     }
   };
 
+  private toggleUserSelect(active = true) {
+    const value = active ? 'none' : '';
+    this.document.body.style.userSelect = value;
+    this.document.body.style.webkitUserSelect = value;
+  }
+
   private enableDragging() {
-    this.mouseMoveSubscription = this.flow.onMouse.subscribe(this.onMouseMove);
-    this.el.nativeElement.addEventListener('mouseup', this.onMouseUp);
     this.el.nativeElement.addEventListener('mousedown', this.onMouseDown);
   }
 
   private disableDragging() {
-    this.mouseMoveSubscription?.unsubscribe();
-    this.el.nativeElement.removeEventListener('mouseup', this.onMouseUp);
+    // this.mouseMoveSubscription?.unsubscribe();
+    // this.el.nativeElement.removeEventListener('mouseup', this.onMouseUp);
     this.el.nativeElement.removeEventListener('mousedown', this.onMouseDown);
   }
 
   ngOnInit() {
-    this.updatePosition(this.position.x, this.position.y);
+    this.updatePosition(this.flowChild.x, this.flowChild.y);
   }
 
   ngOnChanges(changes: SimpleChanges): void {

@@ -39,8 +39,8 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
       ></app-toolbar>
       <select [formControl]="selectedNode">
         <label>Select node</label>
-        @for (item of list; track item.id; ) {
-        <option [value]="item.id">{{ item.id }}</option>
+        @for (item of list; track item.id) {
+          <option [value]="item.id">{{ item.id }}</option>
         }
       </select>
       <ngu-flow
@@ -48,21 +48,22 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
         [config]="config"
       >
         @for (item of list; track item.id; let i = $index) {
-        <div
-          class="card flex items-center justify-center w-[250px] h-[60px] bg-white"
-          [flowChild]="item"
-        >
-          <!-- <app-editor></app-editor> -->
-
           <div
-            class="pointer-events-none flex items-center justify-center w-7 h-7 mr-6 bg-gray-200 rounded-full"
+            class="card flex items-center justify-center w-[220px] h-[200px] bg-white"
+            [flowChild]="item"
+            #flowChild
           >
-            {{ item.id }}
+            <!-- <app-editor></app-editor> -->
+
+            <div
+              class="pointer-events-none flex items-center justify-center w-7 h-7 mr-6 bg-gray-200 rounded-full"
+            >
+              {{ item.id }}
+            </div>
+            <!-- <button (click)="demoService.addNode(item, list)">Add</button>
+            <button (click)="deleteNode(item.id)">Delete</button> -->
+            <!-- <button (click)="startLinking(i)">Link</button> -->
           </div>
-          <button (click)="demoService.addNode(item, list)">Add</button>
-          <button (click)="deleteNode(item.id)">Delete</button>
-          <!-- <button (click)="startLinking(i)">Link</button> -->
-        </div>
         }
       </ngu-flow>
     </div>
@@ -100,7 +101,32 @@ export class DemoOneComponent implements AfterViewInit {
   selectedNode = new FormControl<string>('11', { nonNullable: true });
 
   constructor() {
-    this.list = structuredClone(FLOW_LIST);
+    // this.list = structuredClone(FLOW_LIST);
+    this.list = [
+      { x: 0, y: 0, id: '1', deps: [] },
+      { x: 0, y: 0, id: '2', deps: ['1'] },
+      { x: 0, y: 0, id: '3', deps: ['1'] },
+      { x: 0, y: 0, id: '5', deps: ['1'] },
+      { x: 0, y: 0, id: '4', deps: ['3', '2'] },
+
+      // { x: 0, y: 0, id: '1', deps: [] },
+      // { x: 0, y: 0, id: '2', deps: ['1'] },
+      // { x: 0, y: 0, id: '3', deps: ['2'] },
+      // { x: 0, y: 0, id: '4', deps: ['3'] },
+      // { x: 0, y: 0, id: '5', deps: ['3'] },
+      // { x: 0, y: 0, id: '6', deps: ['4'] },
+      // { x: 0, y: 0, id: '7', deps: ['6'] },
+      // { x: 0, y: 0, id: '8', deps: ['7'] },
+      // { x: 0, y: 0, id: '9', deps: ['7'] },
+      // { x: 0, y: 0, id: '10', deps: ['9'] },
+      // { x: 0, y: 0, id: '11', deps: ['10', '8'] },
+      // { x: 0, y: 0, id: '12', deps: ['8'] },
+      // { x: 0, y: 0, id: '13', deps: ['12'] },
+      // { x: 0, y: 0, id: '14', deps: ['13'] },
+      // { x: 0, y: 0, id: '15', deps: ['14'] },
+      // { x: 0, y: 0, id: '16', deps: ['14'] },
+      // { x: 0, y: 0, id: '17', deps: ['15', '16'] },
+    ];
     this.selectedNode.valueChanges.subscribe((id) => {
       this.plugins.scroll.focus(id);
     });
