@@ -16,7 +16,6 @@
     "strictPropertyInitialization": false,
     "sourceMap": true,
     "declaration": false,
-    "downlevelIteration": true,
     "experimentalDecorators": true,
     "moduleResolution": "node",
     "esModuleInterop": true,

@@ -45,10 +45,10 @@ export class Arrangements implements FlowPlugin {
 
     ROOT_DATA.clear();
     ROOT_DEPS.clear();
-    this.list.forEach((item) => {
+    for (const item of this.list) {
       ROOT_DATA.set(
         item.position.id,
-        new ArrangeNode(item.position, item.elRect)
+        new ArrangeNode(item.position, item.elRect),
       );
       item.position.deps.forEach((dep) => {
         let d = ROOT_DEPS.get(dep) || [];
@@ -59,12 +59,12 @@ export class Arrangements implements FlowPlugin {
       if (item.position.deps.length === 0) {
         this.root.push(item.position.id);
       }
-    });
+    }
 
-    this.root.forEach((id) => {
+    for (const id of this.root) {
       const node = ROOT_DATA.get(id)!;
       node.arrange(0, 0, this.direction);
-    });
+    }
 
     const newItems = new Map<string, FlowOptions>();
 
@@ -81,7 +81,10 @@ interface Coordinates {
 }
 
 export class ArrangeNode {
-  constructor(public position: FlowOptions, public elRect: DOMRect) {}
+  constructor(
+    public position: FlowOptions,
+    public elRect: DOMRect,
+  ) {}
 
   get deps() {
     return ROOT_DEPS.get(this.position.id) || [];
@@ -89,10 +92,10 @@ export class ArrangeNode {
 
   // we need to recursively call this method to get all the dependents of the node
   // and then we need to position them
-  arrange(x: number, y: number, direction: FlowDirection): Coordinates {
+  arrange(sx: number, sy: number, direction: FlowDirection): Coordinates {
     const dependents = ROOT_DEPS.get(this.position.id) || [];
-    let startX = x;
-    let startY = y;
+    let startX = sx;
+    let startY = sy;
     let len = dependents.length;
 
     if (len) {
@@ -119,14 +122,14 @@ export class ArrangeNode {
       }
       if (direction === 'horizontal') {
         startY -= VERTICAL_PADDING + this.elRect.height;
-        y = first.y + (last.y - first.y) / 2;
+        sy = first.y + (last.y - first.y) / 2;
       } else {
         startX -= VERTICAL_PADDING + this.elRect.width;
-        x = first.x + (last.x - first.x) / 2;
+        sx = first.x + (last.x - first.x) / 2;
       }
     }
-    this.position.x = x;
-    this.position.y = y;
+    this.position.x = sx;
+    this.position.y = sy;
 
     return direction === 'horizontal'
       ? { x: startX, y: startY + this.elRect.height }

@@ -1,18 +1,12 @@
 import { ChangeDetectionStrategy, Component, OnDestroy } from '@angular/core';
-import { NgxTiptapModule } from 'ngx-tiptap';
-import { Editor } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
 import { FormsModule } from '@angular/forms';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, NgxTiptapModule],
+  imports: [FormsModule],
   selector: 'app-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<tiptap-editor
-    [editor]="editor"
-    [(ngModel)]="value"
-  ></tiptap-editor> `,
+  template: ``,
   styles: [
     `
       :host {
@@ -25,13 +19,7 @@ import { FormsModule } from '@angular/forms';
   ],
 })
 export class EditorComponent implements OnDestroy {
-  editor = new Editor({
-    extensions: [StarterKit],
-  });
-
   value = '<p>Hello, Tiptap!</p>';
 
-  ngOnDestroy(): void {
-    this.editor.destroy();
-  }
+  ngOnDestroy(): void {}
 }
