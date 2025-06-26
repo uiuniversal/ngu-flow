@@ -105,7 +105,7 @@ function getDirectionAdjustment(
   cpX: number;
   cpY: number;
 } {
-  console.log(arrowSize);
+  // console.log(arrowSize);
   // 'controlPointDistance' is a new property to be defined. It determines how 'curvy' the path should be.
   // Adjust this value to increase or decrease the curvature of the Bezier path.
   let controlPointDistance = 50;

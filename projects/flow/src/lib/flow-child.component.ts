@@ -123,11 +123,15 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
       const cx = event.clientX - zRect.left;
       const cy = event.clientY - zRect.top;
       const x =
-        Math.round((cx - this.flow.panX - this.offsetX) / (this.flow.gridSize * this.flow.scale)) *
-        this.flow.gridSize;
+        Math.round(
+          (cx - this.flow.panX - this.offsetX) /
+            (this.flow.gridSize * this.flow.scale),
+        ) * this.flow.gridSize;
       const y =
-        Math.round((cy - this.flow.panY - this.offsetY) / (this.flow.gridSize * this.flow.scale)) *
-        this.flow.gridSize;
+        Math.round(
+          (cy - this.flow.panY - this.offsetY) /
+            (this.flow.gridSize * this.flow.scale),
+        ) * this.flow.gridSize;
 
       this.position.x = x;
       this.position.y = y;

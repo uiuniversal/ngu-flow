@@ -16,7 +16,12 @@ import {
 import { startWith } from 'rxjs';
 import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
-import { FlowOptions, ChildInfo, FlowDirection, ArrowPathFn } from './flow-interface';
+import {
+  FlowOptions,
+  ChildInfo,
+  FlowDirection,
+  ArrowPathFn,
+} from './flow-interface';
 import { FlowConfig, FlowPlugin } from './plugins/plugin';
 import { Connections } from './plugins/connections';
 
@@ -120,9 +125,12 @@ const BASE_SCALE_AMOUNT = 0.05;
     `,
   ],
 })
-export class FlowComponent implements OnInit, AfterContentInit, AfterViewInit, OnDestroy {
+export class FlowComponent
+  implements OnInit, AfterContentInit, AfterViewInit, OnDestroy
+{
   @Input() config: FlowConfig = new FlowConfig();
-  @ContentChildren(FlowChildComponent) children = new QueryList<FlowChildComponent>();
+  @ContentChildren(FlowChildComponent) children =
+    new QueryList<FlowChildComponent>();
 
   // @ViewChildren('arrowPaths') arrowPaths: QueryList<ElementRef<SVGPathElement>>;
   @ViewChild('zoomContainer') zoomContainer!: ElementRef<HTMLDivElement>;
@@ -150,13 +158,24 @@ export class FlowComponent implements OnInit, AfterContentInit, AfterViewInit, O
     this.config = { ...new FlowConfig(), ...this.config };
     this.flow.config = this.config;
     this.calculateArrowSize();
-    this.flow.arrowsChange.subscribe((e) => this.updateArrows(e));
+    this.flow.arrowsChange.subscribe((e) => {
+      this.runPlugin((p) => p.onNodeChange?.(this, e));
+    });
     this.ngZone.runOutsideAngular(() => {
       this.el.nativeElement.addEventListener('wheel', this._wheelPanning);
 
-      this.el.nativeElement.addEventListener('mousedown', this._startDraggingZoomContainer);
-      this.el.nativeElement.addEventListener('mouseup', this._stopDraggingZoomContainer);
-      this.el.nativeElement.addEventListener('mousemove', this._dragZoomContainer);
+      this.el.nativeElement.addEventListener(
+        'mousedown',
+        this._startDraggingZoomContainer,
+      );
+      this.el.nativeElement.addEventListener(
+        'mouseup',
+        this._stopDraggingZoomContainer,
+      );
+      this.el.nativeElement.addEventListener(
+        'mousemove',
+        this._dragZoomContainer,
+      );
     });
   }
 
@@ -170,8 +189,13 @@ export class FlowComponent implements OnInit, AfterContentInit, AfterViewInit, O
   }
 
   ngAfterViewInit(): void {
-    this.createArrows();
     this.runPlugin((e) => e.afterInit?.(this));
+    this.children.changes.pipe(startWith(this.children)).subscribe(() => {
+      this.flow.update(this.children.map((x) => x.position));
+      this.runPlugin((e) => e.beforeUpdate?.(this));
+      this.runPlugin((e) => e.onChange?.(this));
+      requestAnimationFrame(() => this.runPlugin((p) => p.afterUpdate?.(this)));
+    });
   }
 
   private runPlugin(callback: (e: FlowPlugin) => void) {
@@ -186,14 +210,7 @@ export class FlowComponent implements OnInit, AfterContentInit, AfterViewInit, O
     }
   }
 
-  ngAfterContentInit() {
-    this.children.changes.pipe(startWith(this.children)).subscribe((children) => {
-      this.flow.update(this.children.map((x) => x.position));
-      this.runPlugin((e) => e.beforeUpdate?.(this));
-      this.createArrows();
-    });
-    requestAnimationFrame(() => this.updateArrows()); // this required for angular to render the dot
-  }
+  ngAfterContentInit() {}
 
   updateChildDragging(enable = true) {
     this.flow.enableChildDragging.next(enable);
@@ -206,12 +223,14 @@ export class FlowComponent implements OnInit, AfterContentInit, AfterViewInit, O
   updateDirection(direction: FlowDirection) {
     this.flow.config.direction = direction;
     this.runPlugin((e) => e.beforeUpdate?.(this));
-    this.createArrows();
+    this.runPlugin((e) => e.onChange?.(this));
+    requestAnimationFrame(() => this.runPlugin((p) => p.afterUpdate?.(this)));
   }
 
   updateArrowFn(fn: ArrowPathFn) {
     this.flow.arrowFn = fn;
-    this.createArrows();
+    this.runPlugin((e) => e.onChange?.(this));
+    requestAnimationFrame(() => this.runPlugin((p) => p.afterUpdate?.(this)));
   }
 
   public _startDraggingZoomContainer = (event: MouseEvent) => {
@@ -335,49 +354,6 @@ export class FlowComponent implements OnInit, AfterContentInit, AfterViewInit, O
     });
   }
 
-  createArrows() {
-    if (!this.g) {
-      return;
-    }
-    // Clear existing arrows
-    this.flow.arrows = [];
-    const gElement: SVGGElement = this.g.nativeElement;
-    // Remove existing paths
-    while (gElement.firstChild) {
-      gElement.removeChild(gElement.firstChild);
-    }
-    // Calculate new arrows - now iterating through parents to connect to children
-    this.list.forEach((parent) => {
-      parent.position.children.forEach((childId) => {
-        const child = this.list.find((c) => c.position.id === childId);
-        if (child) {
-          const arrow = {
-            d: `M${parent.position.x},${parent.position.y} L${child.position.x},${child.position.y}`,
-            deps: [parent.position.id, child.position.id],
-            startDot: 0,
-            endDot: 0,
-            id: `arrow${parent.position.id}-to-${child.position.id}`,
-          };
-
-          // Create path element and set attributes
-          const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          pathElement.setAttribute('d', arrow.d);
-          pathElement.setAttribute('id', arrow.id);
-          pathElement.setAttribute('stroke', 'var(--flow-path-color)');
-          pathElement.setAttribute('stroke-width', this.config.strokeWidth!.toString());
-          pathElement.setAttribute('fill', 'none');
-          pathElement.setAttribute('marker-end', 'url(#arrowhead)');
-
-          // Append path to <g> element
-          gElement.appendChild(pathElement);
-
-          this.flow.arrows.push(arrow);
-        }
-      });
-    });
-    this.updateArrows();
-  }
-
   positionChange(position: FlowOptions) {
     // Find the item in the list
     const item = this.list.find((item) => item.position.id === position.id);
@@ -388,15 +364,7 @@ export class FlowComponent implements OnInit, AfterContentInit, AfterViewInit, O
     item.position.y = position.y;
 
     // Update arrows
-    this.updateArrows();
-  }
-
-  updateArrows(e?: FlowOptions) {
-    this.runPlugin((e) => e.afterUpdate?.(this));
-    // const gElement: SVGGElement = this.g.nativeElement;
-    // const childObj = this.getChildInfo();
-    // Handle reverse dependencies
-    // this.flow.connections = new Connections(this.list, this.flow.direction);
+    requestAnimationFrame(() => this.runPlugin((p) => p.onNodeChange?.(this, position)));
   }
 
   oldChildObj() {

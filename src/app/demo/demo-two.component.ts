@@ -29,7 +29,7 @@ import { DemoService } from './demo.service';
     ToolbarComponent,
   ],
   template: `
-    <div class="flex flex-col items-center justify-center h-[700px]">
+    <div class="flex flex-col items-center justify-center h-[90vh]">
       <app-toolbar
         class="block p-3"
         (fitToWindow)="fitToWindow()"
@@ -98,7 +98,7 @@ export class DemoTwoComponent implements AfterViewInit {
   demoService = inject(DemoService);
   plugins = {
     scroll: new ScrollIntoView('1'),
-    fitWindow: new FitToWindow(false),
+    fitWindow: new FitToWindow(true),
     arrange: new Arrangements(),
   };
   config: FlowConfig = {

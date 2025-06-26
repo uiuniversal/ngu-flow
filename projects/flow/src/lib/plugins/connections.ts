@@ -2,6 +2,7 @@ import { ChildInfo, DotOptions, FlowOptions } from '../flow-interface';
 import { FlowChildComponent } from '../flow-child.component';
 import { FlowComponent } from '../flow.component';
 import { FlowPlugin } from './plugin';
+import { Arrow } from '../flow.service';
 
 export class Connections implements FlowPlugin {
   // key = id of the item
@@ -20,55 +21,138 @@ export class Connections implements FlowPlugin {
     this.setData(data);
   }
 
+  onChange(data: FlowComponent): void {
+    this.setData(data);
+    this.createArrows();
+  }
+
+  beforeUpdate(data: FlowComponent): void {
+    this.closestDots.clear();
+  }
+
+  onNodeChange(data: FlowComponent, node: FlowOptions): void {
+    this.data = data;
+    this.list = data.list;
+    const nodeId = node.id;
+
+    const arrowsToUpdate = this.data.flow.arrows.filter((arrow) =>
+      arrow.deps.includes(nodeId),
+    );
+
+    // Clear the closest dot cache for the connections involving this node.
+    arrowsToUpdate.forEach((arrow) => {
+      const [from, to] = arrow.deps;
+      this.closestDots.delete(`${from}-${to}`);
+      this.closestDots.delete(`${to}-${from}`);
+    });
+
+    arrowsToUpdate.forEach((arrow) => this.updateArrowPath(arrow));
+    this.updateDotVisibility(this.data.oldChildObj());
+  }
+
   afterUpdate(data: FlowComponent): void {
     this.setData(data);
+    this.data.flow.arrows.forEach((arrow) => this.updateArrowPath(arrow));
+    this.updateDotVisibility(this.data.oldChildObj());
+  }
 
+  private updateArrowPath(arrow: Arrow) {
     const gElement: SVGGElement = this.data.g.nativeElement;
     const childObj = this.data.getChildInfo();
-    // Calculate new arrows
-    this.data.flow.arrows.forEach((arrow) => {
-      const [from, to] = arrow.deps;
-      const fromItem = childObj[from];
-      const toItem = childObj[to];
-      if (fromItem && toItem) {
-        const [endDotIndex, startDotIndex] = this.getClosestDotsSimplified(toItem, from);
+    const [from, to] = arrow.deps;
+    const fromItem = childObj[from];
+    const toItem = childObj[to];
 
-        const startDot = this.getDotByIndex(
-          childObj,
-          fromItem.position,
-          startDotIndex,
-          this.data.flow.scale,
-          this.data.flow.panX,
-          this.data.flow.panY,
-        );
-        const endDot = this.getDotByIndex(
-          childObj,
-          toItem.position,
-          endDotIndex,
-          this.data.flow.scale,
-          this.data.flow.panX,
-          this.data.flow.panY,
-        );
+    if (fromItem && toItem) {
+      const [endDotIndex, startDotIndex] = this.getClosestDotsSimplified(
+        toItem,
+        from,
+      );
 
-        // Draw arrow from start (parent) to end (child)
-        arrow.d = this.data.flow.arrowFn(
-          startDot,
-          endDot,
-          this.data.flow.config.arrows ? this.data.flow.config.arrowSize : 0,
-          2,
-        );
-      }
+      const startDot = this.getDotByIndex(
+        childObj,
+        fromItem.position,
+        startDotIndex,
+        this.data.flow.scale,
+        this.data.flow.panX,
+        this.data.flow.panY,
+      );
+      const endDot = this.getDotByIndex(
+        childObj,
+        toItem.position,
+        endDotIndex,
+        this.data.flow.scale,
+        this.data.flow.panX,
+        this.data.flow.panY,
+      );
 
-      // Update the SVG paths
-      this.data.flow.arrows.forEach((arrow) => {
-        const pathElement = gElement.querySelector(`#${arrow.id}`) as SVGPathElement;
-        if (pathElement) {
+      // Draw arrow from start (parent) to end (child)
+      arrow.d = this.data.flow.arrowFn(
+        startDot,
+        endDot,
+        this.data.flow.config.arrows ? this.data.flow.config.arrowSize : 0,
+        2,
+      );
+    }
+
+    // Update the SVG paths
+    const pathElement = gElement.querySelector(
+      `#${arrow.id}`,
+    ) as SVGPathElement;
+    if (pathElement) {
+      pathElement.setAttribute('d', arrow.d);
+    }
+  }
+
+  createArrows() {
+    if (!this.data.g) {
+      return;
+    }
+    console.log('createArrows');
+    // Clear existing arrows
+    this.data.flow.arrows = [];
+    const gElement: SVGGElement = this.data.g.nativeElement;
+    // Remove existing paths
+    while (gElement.firstChild) {
+      gElement.removeChild(gElement.firstChild);
+    }
+    // Calculate new arrows - now iterating through parents to connect to children
+    this.list.forEach((parent) => {
+      parent.position.children.forEach((childId) => {
+        const child = this.list.find((c) => c.position.id === childId);
+        if (child) {
+          const arrow: Arrow = {
+            d: `M${parent.position.x},${parent.position.y} L${child.position.x},${child.position.y}`,
+            deps: [parent.position.id, child.position.id],
+            startDot: 0,
+            endDot: 0,
+            id: `arrow${parent.position.id}-to-${child.position.id}`,
+          };
+
+          // Create path element and set attributes
+          const pathElement = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'path',
+          );
           pathElement.setAttribute('d', arrow.d);
+          pathElement.setAttribute('id', arrow.id);
+          pathElement.setAttribute('stroke', 'var(--flow-path-color)');
+          pathElement.setAttribute(
+            'stroke-width',
+            this.data.config.strokeWidth!.toString(),
+          );
+          pathElement.setAttribute('fill', 'none');
+          if (this.data.config.arrows) {
+            pathElement.setAttribute('marker-end', 'url(#arrowhead)');
+          }
+
+          // Append path to <g> element
+          gElement.appendChild(pathElement);
+
+          this.data.flow.arrows.push(arrow);
         }
       });
     });
-
-    this.updateDotVisibility(this.data.oldChildObj());
   }
 
   private setData(data: FlowComponent) {
@@ -78,7 +162,10 @@ export class Connections implements FlowPlugin {
     this.setReverseDepsMap(this.list.map((x) => x.position));
   }
 
-  public getClosestDotsSimplified(item: ChildInfo, dep: string): [number, number] {
+  public getClosestDotsSimplified(
+    item: ChildInfo,
+    dep: string,
+  ): [number, number] {
     const parents = this.data.flow.parents.get(item.position.id) || [];
     const ids = [...item.position.children, ...parents];
     ids.forEach((x) => this.findClosestDot(x, item));
@@ -107,14 +194,18 @@ export class Connections implements FlowPlugin {
 
     const dep = this.list.find((item) => item.position.id === depId);
     if (dep) {
-      const [closestDotIndex1, closestDotIndex2] = this._findClosestConnectionPoints(item, dep);
+      const [closestDotIndex1, closestDotIndex2] =
+        this._findClosestConnectionPoints(item, dep);
 
       this.closestDots.set(uniqueKey1, closestDotIndex1);
       this.closestDots.set(uniqueKey2, closestDotIndex2);
     }
   }
 
-  public _findClosestConnectionPoints(parent: ChildInfo, child: ChildInfo): [number, number] {
+  public _findClosestConnectionPoints(
+    parent: ChildInfo,
+    child: ChildInfo,
+  ): [number, number] {
     // sides dot index order: [top, right, bottom, left]
     let swapped = false;
     const isV = this.direction === 'vertical';
@@ -149,39 +240,32 @@ export class Connections implements FlowPlugin {
     parent: ChildInfo,
     isV: boolean,
   ): 'right' | 'left' | 'bottom' | 'top' {
-    // consider width and height of the child
-    const { width, height } = child.elRect;
-    const { x, y } = child.position;
-    const { x: px, y: py } = parent.position;
-
-    if (!isV) {
-      if (x + width < px) return 'left';
-      if (x - width > px) return 'right';
-      if (y + height < py) return 'top';
-      if (y - height > py) return 'bottom';
+    if (isV) {
+      return parent.position.y < child.position.y ? 'bottom' : 'top';
     } else {
-      if (y + height < py) return 'top';
-      if (y - height > py) return 'bottom';
-      if (x + width < px) return 'left';
-      if (x - width > px) return 'right';
+      return parent.position.x < child.position.x ? 'right' : 'left';
     }
-    return 'right';
   }
 
   private updateDotVisibility(childObj: Record<string, FlowChildComponent>) {
-    Object.keys(childObj).forEach((id) => {
+    // Object.keys(childObj).forEach((id) => {
+    for (const id in childObj) {
       const child = childObj[id];
       const dots = child.dots.toArray();
 
-      dots.forEach((dot, index) => {
+      // dots.forEach((dot, index) => {
+      for (let index = 0; index < dots.length; index++) {
+        const dot = dots[index];
         // Check if the current dot is the closest for any dependency
         const isClosestForAnyDep = Array.from(this.closestDots.keys()).some(
           (key) => key.startsWith(id) && this.closestDots.get(key) === index,
         );
 
-        dot.nativeElement.style.visibility = isClosestForAnyDep ? 'visible' : 'hidden';
-      });
-    });
+        dot.nativeElement.style.visibility = isClosestForAnyDep
+          ? 'visible'
+          : 'hidden';
+      }
+    }
   }
 
   private getDotByIndex(

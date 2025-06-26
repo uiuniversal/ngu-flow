@@ -1,20 +1,44 @@
 import { FlowOptions, ChildInfo, FlowDirection } from '../flow-interface';
 import { FlowComponent } from '../flow.component';
 import { FlowPlugin } from './plugin';
-
-const ROOT_DATA = new Map<string, ArrangeNode>();
-const ROOT_CHILDREN = new Map<string, string[]>();
-const HORIZONTAL_PADDING = 100;
-const VERTICAL_PADDING = 20;
+import {
+  LayoutAlgorithm,
+  LayoutNode,
+  LayoutOptions,
+} from './layouts/layout-algorithm';
+import { SimpleTreeLayout } from './layouts/simple-tree-layout';
+import { SugiyamaLayout } from './layouts/sugiyama-layout';
 
 export class Arrangements implements FlowPlugin {
-  root: string[] = [];
   data!: FlowComponent;
   private list!: ChildInfo[];
-  private direction: FlowDirection = 'vertical';
+  private direction: FlowDirection = 'horizontal';
   public horizontalPadding = 100;
   public verticalPadding = 20;
   public groupPadding = 20;
+  private layoutAlgorithm: LayoutAlgorithm;
+  private autoArrange = true;
+
+  constructor(
+    data?: Partial<{
+      layoutAlgorithm: LayoutAlgorithm;
+      autoArrange: boolean;
+      verticalPadding: number;
+      horizontalPadding: number;
+    }>,
+  ) {
+    this.layoutAlgorithm = data?.layoutAlgorithm ?? new SimpleTreeLayout();
+    this.autoArrange = data?.autoArrange ?? true;
+    this.verticalPadding = data?.verticalPadding ?? 20;
+    this.horizontalPadding = data?.horizontalPadding ?? 100;
+  }
+
+  /**
+   * Get the current layout algorithm
+   */
+  public getLayoutAlgorithm(): LayoutAlgorithm {
+    return this.layoutAlgorithm;
+  }
 
   onInit(data: FlowComponent): void {
     this.data = data;
@@ -22,7 +46,19 @@ export class Arrangements implements FlowPlugin {
 
   beforeUpdate(data: FlowComponent): void {
     this.data = data;
-    this.runArrange();
+    // Don't auto-arrange on every update
+  }
+
+  onChange(data: FlowComponent): void {
+    this.data = data;
+    // Only auto-arrange if enabled
+    if (this.autoArrange) {
+      this.runArrange();
+    }
+  }
+
+  enableAutoArrange(enabled: boolean = true): void {
+    this.autoArrange = enabled;
   }
 
   private runArrange() {
@@ -33,110 +69,65 @@ export class Arrangements implements FlowPlugin {
 
   arrange() {
     this.runArrange();
-    this.data.updateArrows();
+  }
+
+  public setLayoutAlgorithm(algorithm: LayoutAlgorithm): void {
+    this.layoutAlgorithm = algorithm;
   }
 
   public _autoArrange(): Map<string, FlowOptions> {
     this.list = this.data.list;
     this.direction = this.data.flow.config.direction!;
-    this.horizontalPadding = this.data.flow.horizontalPadding;
-    this.verticalPadding = this.data.flow.verticalPadding;
-    this.groupPadding = this.data.flow.groupPadding;
+    // this.horizontalPadding = this.data.flow.horizontalPadding;
+    // this.verticalPadding = this.data.flow.verticalPadding;
+    // this.groupPadding = this.data.flow.groupPadding;
 
-    ROOT_DATA.clear();
-    ROOT_CHILDREN.clear();
-    const hasParent = new Set<string>();
-    
-    for (const item of this.list) {
-      ROOT_DATA.set(item.position.id, new ArrangeNode(item.position, item.elRect));
-      ROOT_CHILDREN.set(item.position.id, item.position.children);
-      
-      // Track which nodes have parents
-      item.position.children.forEach((childId) => {
-        hasParent.add(childId);
-      });
-    }
-    
-    // Root nodes are those without parents
-    this.root = [];
-    for (const item of this.list) {
-      if (!hasParent.has(item.position.id)) {
-        this.root.push(item.position.id);
+    // Convert to layout nodes with fallback dimensions
+    const layoutNodes: LayoutNode[] = this.list.map((item) => {
+      const width = item.elRect.width || 150;
+      const height = item.elRect.height || 50;
+
+      // Log for debugging
+      if (!item.elRect.width || !item.elRect.height) {
+        console.warn(
+          `Node ${item.position.id} has no dimensions, using defaults: ${width}x${height}`,
+        );
       }
-    }
 
-    for (const id of this.root) {
-      const node = ROOT_DATA.get(id)!;
-      node?.arrange(0, 0, this.direction);
-    }
+      return {
+        id: item.position.id,
+        width,
+        height,
+        children: item.position.children,
+      };
+    });
+    // console.log(layoutNodes);
 
+    // Configure layout options
+    const layoutOptions: LayoutOptions = {
+      direction: this.direction,
+      horizontalSpacing: this.horizontalPadding,
+      verticalSpacing: this.verticalPadding,
+      gridSize: this.data.flow.gridSize || 1,
+    };
+
+    // Run layout algorithm
+    const layoutResult = this.layoutAlgorithm.layout(
+      layoutNodes,
+      layoutOptions,
+    );
+
+    // Update positions
     const newItems = new Map<string, FlowOptions>();
-
     for (const item of this.list) {
+      const newPos = layoutResult.positions.get(item.position.id);
+      if (newPos) {
+        item.position.x = newPos.x;
+        item.position.y = newPos.y;
+      }
       newItems.set(item.position.id, item.position);
     }
+
     return newItems;
-  }
-}
-
-interface Coordinates {
-  x: number;
-  y: number;
-}
-
-export class ArrangeNode {
-  constructor(
-    public position: FlowOptions,
-    public elRect: DOMRect,
-  ) {}
-
-  get children() {
-    return ROOT_CHILDREN.get(this.position.id) || [];
-  }
-
-  // we need to recursively call this method to get all the children of the node
-  // and then we need to position them
-  arrange(sx: number, sy: number, direction: FlowDirection): Coordinates {
-    const children = ROOT_CHILDREN.get(this.position.id) || [];
-    let startX = sx;
-    let startY = sy;
-    let len = children.length;
-
-    if (len) {
-      if (direction === 'horizontal') {
-        startX += this.elRect.width + HORIZONTAL_PADDING;
-      } else {
-        startY += this.elRect.height + HORIZONTAL_PADDING;
-      }
-      let first: Coordinates = { x: 0, y: 0 };
-      let last: Coordinates = { x: 0, y: 0 };
-      for (let i = 0; i < len; i++) {
-        const childId = children[i];
-        const child = ROOT_DATA.get(childId)!;
-        const { x, y } = child.arrange(startX, startY, direction);
-        // capture the first and last child
-        if (i === 0) first = child.position;
-        if (i === len - 1) last = child.position;
-
-        if (direction === 'horizontal') {
-          startY = y + VERTICAL_PADDING;
-        } else {
-          startX = x + VERTICAL_PADDING;
-        }
-      }
-      if (direction === 'horizontal') {
-        startY -= VERTICAL_PADDING + this.elRect.height;
-        sy = first.y + (last.y - first.y) / 2;
-      } else {
-        startX -= VERTICAL_PADDING + this.elRect.width;
-        sx = first.x + (last.x - first.x) / 2;
-      }
-    }
-    this.position.x = sx;
-    this.position.y = sy;
-
-    return direction === 'horizontal'
-      ? { x: startX, y: startY + this.elRect.height }
-      : { x: startX + this.elRect.width, y: startY };
   }
 }

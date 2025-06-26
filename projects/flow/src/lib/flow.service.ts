@@ -14,9 +14,6 @@ export class FlowService {
   isChildDragging!: boolean;
   enableChildDragging = new BehaviorSubject(true);
   enableZooming = new BehaviorSubject(true);
-  horizontalPadding = 100;
-  verticalPadding = 20;
-  groupPadding = 40;
   scale = 1;
   panX = 0;
   panY = 0;
@@ -61,7 +58,7 @@ export class FlowService {
   }
 }
 
-interface Arrow {
+export interface Arrow {
   d: any;
   deps: string[];
   id: string;

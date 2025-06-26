@@ -4,6 +4,7 @@ import {
   Component,
   ViewChild,
   inject,
+  signal,
 } from '@angular/core';
 import {
   FlowComponent,
@@ -20,7 +21,7 @@ import { DemoService } from './demo.service';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'app-demo-one',
+  selector: 'app-chain',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -39,7 +40,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
       ></app-toolbar>
       <select [formControl]="selectedNode">
         <label>Select node</label>
-        @for (item of list; track item.id) {
+        @for (item of list(); track item.id) {
           <option [value]="item.id">{{ item.id }}</option>
         }
       </select>
@@ -47,9 +48,9 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
         class="max-w-[90%] max-h-[90%] border bg-gray-100"
         [config]="config"
       >
-        @for (item of list; track item.id; let i = $index) {
+        @for (item of list(); track item.id; let i = $index) {
           <div
-            class="card flex items-center justify-center w-[250px] h-[60px] bg-white"
+            class="card w-[250px] bg-white p-4 flex flex-col items-center justify-center gap-2 rounded-2xl"
             [flowChild]="item"
           >
             <!-- <app-editor></app-editor> -->
@@ -57,10 +58,12 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
             <div
               class="pointer-events-none flex items-center justify-center w-7 h-7 mr-6 bg-gray-200 rounded-full"
             >
-              {{ item.id }}
+              <!-- {{ item.id }} -->
             </div>
-            <button (click)="demoService.addNode(item, list)">Add</button>
-            <button (click)="deleteNode(item.id)">Delete</button>
+            <div class="text-sm font-bold">{{ item.node.name }}</div>
+            <div class="text-xs text-gray-500">{{ item.node.description }}</div>
+            <!-- <button (click)="demoService.addNode(item, list)">Add</button>
+            <button (click)="deleteNode(item.id)">Delete</button> -->
             <!-- <button (click)="startLinking(i)">Link</button> -->
           </div>
         }
@@ -71,7 +74,6 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
     `
       .card {
         box-shadow: 0 0 5px 0 rgb(142 142 142 / 37%);
-        border-radius: 5px;
       }
 
       button {
@@ -80,16 +82,19 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
     `,
   ],
 })
-export class DemoOneComponent implements AfterViewInit {
+export class ChainComponent implements AfterViewInit {
   title = 'angular-flow';
-  list: FlowOptions[] = [];
+  list = signal<(FlowOptions & { node: any })[]>([]);
   linkingFrom: number | null = null; // Store the index of the node that we start linking from
   @ViewChild(FlowComponent) flowComponent: FlowComponent;
   demoService = inject(DemoService);
   plugins = {
     scroll: new ScrollIntoView('1'),
     fitWindow: new FitToWindow(true),
-    arrange: new Arrangements(),
+    arrange: new Arrangements({
+      verticalPadding: 100,
+      horizontalPadding: 100,
+    }),
   };
   config: FlowConfig = {
     arrows: true,
@@ -101,52 +106,144 @@ export class DemoOneComponent implements AfterViewInit {
 
   constructor() {
     // this.list = structuredClone(FLOW_LIST);
-    this.list = [
-      { x: 0, y: 0, id: '1', data: 'E', children: ['2', '5', '6', '29', '30'] },
-      { x: 1, y: 1, id: '2', data: 'T', children: ['3'] },
-      { x: 2, y: 2, id: '3', data: 'F', children: ['4'] },
-      { x: 3, y: 3, id: '4', data: 'IDENT : a', children: [] },
-      { x: 0, y: 1.5, id: '5', data: '+', children: [] },
-      { x: 0, y: 2, id: '6', data: 'T', children: ['7', '18', '19'] },
-      { x: 1, y: 3, id: '7', data: 'F', children: ['8', '9', '17'] },
-      { x: 2, y: 4, id: '8', data: '(', children: [] },
-      { x: 3, y: 4, id: '9', data: 'E', children: ['10', '13', '14'] },
-      { x: 4, y: 5, id: '10', data: 'T', children: ['11'] },
-      { x: 5, y: 6, id: '11', data: 'F', children: ['12'] },
-      { x: 6, y: 7, id: '12', data: 'IDENT : b', children: [] },
-      { x: 4, y: 5.5, id: '13', data: '*', children: [] },
-      { x: 4, y: 6, id: '14', data: 'T', children: ['15'] },
-      { x: 5, y: 7, id: '15', data: 'F', children: ['16'] },
-      { x: 6, y: 8, id: '16', data: 'IDENT : c', children: [] },
-      { x: 2, y: 4.5, id: '17', data: ')', children: [] },
-      { x: 1, y: 3.5, id: '18', data: '*', children: [] },
-      { x: 1, y: 4, id: '19', data: 'F', children: ['20', '21', '28'] },
-      { x: 2, y: 5, id: '20', data: '(', children: [] },
-      { x: 3, y: 5, id: '21', data: 'E', children: ['22', '25', '26'] },
-      { x: 4, y: 6, id: '22', data: 'T', children: ['23'] },
-      { x: 5, y: 7, id: '23', data: 'F', children: ['24'] },
-      { x: 6, y: 8, id: '24', data: 'IDENT : d', children: [] },
-      { x: 4, y: 6.5, id: '25', data: '+', children: [] },
-      { x: 4, y: 7, id: '26', data: 'F', children: ['27'] },
-      { x: 5, y: 8, id: '27', data: 'IDENT : e', children: [] },
-      { x: 2, y: 5.5, id: '28', data: ')', children: [] },
-      { x: 0, y: 2.5, id: '29', data: '+', children: [] },
-      { x: 0, y: 3, id: '30', data: 'T', children: ['31', '33'] },
-      { x: 1, y: 4, id: '31', data: 'F', children: ['32'] },
-      { x: 2, y: 5, id: '32', data: 'IDENT : q', children: [] },
-      { x: 1, y: 4.5, id: '33', data: 'T', children: ['34'] },
-      { x: 2, y: 5.5, id: '34', data: 'F', children: ['35', '36', '44'] },
-      { x: 3, y: 6.5, id: '35', data: '(', children: [] },
-      { x: 4, y: 6.5, id: '36', data: 'E', children: ['37', '40', '41'] },
-      { x: 5, y: 7.5, id: '37', data: 'T', children: ['38'] },
-      { x: 6, y: 8.5, id: '38', data: 'F', children: ['39'] },
-      { x: 7, y: 9.5, id: '39', data: 'IDENT : b', children: [] },
-      { x: 5, y: 8, id: '40', data: '*', children: [] },
-      { x: 5, y: 8.5, id: '41', data: 'T', children: ['42'] },
-      { x: 6, y: 9.5, id: '42', data: 'F', children: ['43'] },
-      { x: 7, y: 10.5, id: '43', data: 'IDENT : a', children: [] },
-      { x: 3, y: 7, id: '44', data: ')', children: [] },
+    // this.list = [
+    //   { x: 0, y: 0, id: '1', data: 'E', children: ['2', '5', '6', '29', '30'] },
+    //   { x: 1, y: 1, id: '2', data: 'T', children: ['3'] },
+    //   { x: 2, y: 2, id: '3', data: 'F', children: ['4'] },
+    //   { x: 3, y: 3, id: '4', data: 'IDENT : a', children: [] },
+    //   { x: 0, y: 1.5, id: '5', data: '+', children: [] },
+    //   { x: 0, y: 2, id: '6', data: 'T', children: ['7', '18', '19'] },
+    //   { x: 1, y: 3, id: '7', data: 'F', children: ['8', '9', '17'] },
+    //   { x: 2, y: 4, id: '8', data: '(', children: [] },
+    //   { x: 3, y: 4, id: '9', data: 'E', children: ['10', '13', '14'] },
+    //   { x: 4, y: 5, id: '10', data: 'T', children: ['11'] },
+    //   { x: 5, y: 6, id: '11', data: 'F', children: ['12'] },
+    //   { x: 6, y: 7, id: '12', data: 'IDENT : b', children: [] },
+    //   { x: 4, y: 5.5, id: '13', data: '*', children: [] },
+    //   { x: 4, y: 6, id: '14', data: 'T', children: ['15'] },
+    //   { x: 5, y: 7, id: '15', data: 'F', children: ['16'] },
+    //   { x: 6, y: 8, id: '16', data: 'IDENT : c', children: [] },
+    //   { x: 2, y: 4.5, id: '17', data: ')', children: [] },
+    //   { x: 1, y: 3.5, id: '18', data: '*', children: [] },
+    //   { x: 1, y: 4, id: '19', data: 'F', children: ['20', '21', '28'] },
+    //   { x: 2, y: 5, id: '20', data: '(', children: [] },
+    //   { x: 3, y: 5, id: '21', data: 'E', children: ['22', '25', '26'] },
+    //   { x: 4, y: 6, id: '22', data: 'T', children: ['23'] },
+    //   { x: 5, y: 7, id: '23', data: 'F', children: ['24'] },
+    //   { x: 6, y: 8, id: '24', data: 'IDENT : d', children: [] },
+    //   { x: 4, y: 6.5, id: '25', data: '+', children: [] },
+    //   { x: 4, y: 7, id: '26', data: 'F', children: ['27'] },
+    //   { x: 5, y: 8, id: '27', data: 'IDENT : e', children: [] },
+    //   { x: 2, y: 5.5, id: '28', data: ')', children: [] },
+    //   { x: 0, y: 2.5, id: '29', data: '+', children: [] },
+    //   { x: 0, y: 3, id: '30', data: 'T', children: ['31', '33'] },
+    //   { x: 1, y: 4, id: '31', data: 'F', children: ['32'] },
+    //   { x: 2, y: 5, id: '32', data: 'IDENT : q', children: [] },
+    //   { x: 1, y: 4.5, id: '33', data: 'T', children: ['34'] },
+    //   { x: 2, y: 5.5, id: '34', data: 'F', children: ['35', '36', '44'] },
+    //   { x: 3, y: 6.5, id: '35', data: '(', children: [] },
+    //   { x: 4, y: 6.5, id: '36', data: 'E', children: ['37', '40', '41'] },
+    //   { x: 5, y: 7.5, id: '37', data: 'T', children: ['38'] },
+    //   { x: 6, y: 8.5, id: '38', data: 'F', children: ['39'] },
+    //   { x: 7, y: 9.5, id: '39', data: 'IDENT : b', children: [] },
+    //   { x: 5, y: 8, id: '40', data: '*', children: [] },
+    //   { x: 5, y: 8.5, id: '41', data: 'T', children: ['42'] },
+    //   { x: 6, y: 9.5, id: '42', data: 'F', children: ['43'] },
+    //   { x: 7, y: 10.5, id: '43', data: 'IDENT : a', children: [] },
+    //   { x: 3, y: 7, id: '44', data: ')', children: [] },
+    // ];
+    const list = [
+      {
+        id: '01963b2a-4d7f-7b8c-9e1d-2f3a4b5c6d7e',
+        x: 0,
+        y: 134,
+        children: [
+          'vector_store_files',
+          '01963b2a-4d7f-7b8c-9e1d-3f4a5b6c7d8e',
+        ],
+        node: {
+          id: '01963b2a-4d7f-7b8c-9e1d-2f3a4b5c6d7e',
+          type: 'trigger_chat',
+          name: 'User Message Trigger',
+          description: 'Processes user message input to start the chain',
+          enabled: true,
+        },
+      },
+      {
+        id: 'vector_store_files',
+        x: 248,
+        y: 0,
+        children: ['01963b2a-4d7f-7b8c-9e1d-3f4a5b6c7d8e'],
+        node: {
+          id: 'vector_store_files',
+          type: 'vector',
+          name: 'Store File Content',
+          description:
+            'Parses and stores uploaded file content in vector database for context',
+          enabled: true,
+        },
+      },
+      {
+        id: '01963b2a-4d7f-7b8c-9e1d-3f4a5b6c7d8e',
+        x: 248,
+        y: 248,
+        children: ['01963b2a-4d7f-7b8c-9e1d-4f5a6b7c8d9e'],
+        node: {
+          id: '01963b2a-4d7f-7b8c-9e1d-3f4a5b6c7d8e',
+          type: 'memory',
+          name: 'Load Conversation History',
+          description:
+            'Retrieves conversation history and adds it to chain state',
+          enabled: true,
+        },
+      },
+      {
+        id: '01963b2a-4d7f-7b8c-9e1d-4f5a6b7c8d9e',
+        x: 497,
+        y: 248,
+        children: ['01963b2a-4d7f-7b8c-9e1d-5f6a7b8c9d0e'],
+        node: {
+          id: '01963b2a-4d7f-7b8c-9e1d-4f5a6b7c8d9e',
+          type: 'llm_call',
+          name: 'Generate Search Question',
+          description:
+            'Generates a standalone search question from conversation context',
+          enabled: true,
+        },
+      },
+      {
+        id: '01963b2a-4d7f-7b8c-9e1d-5f6a7b8c9d0e',
+        x: 745,
+        y: 258,
+        children: ['01963b2a-4d7f-7b8c-9e1d-6f7a8b9c0d1e'],
+        node: {
+          id: '01963b2a-4d7f-7b8c-9e1d-5f6a7b8c9d0e',
+          type: 'vector',
+          name: 'Retrieve Knowledge',
+          description:
+            'Retrieves relevant context using configurable vector system',
+          enabled: true,
+        },
+      },
+      {
+        id: '01963b2a-4d7f-7b8c-9e1d-6f7a8b9c0d1e',
+        x: 994,
+        y: 258,
+        children: [],
+        node: {
+          id: '01963b2a-4d7f-7b8c-9e1d-6f7a8b9c0d1e',
+          type: 'llm_call',
+          name: 'Generate Final Response',
+          description:
+            'Generates the final response using retrieved context, conversation history, and tools',
+          enabled: true,
+        },
+      },
     ];
+
+    setTimeout(() => {
+      this.list.set(list);
+    }, 1000);
 
     this.selectedNode.valueChanges.subscribe((id) => {
       this.plugins.scroll.focus(id);
@@ -166,7 +263,12 @@ export class DemoOneComponent implements AfterViewInit {
   }
 
   deleteNode(id: string) {
-    this.list = structuredClone(this.demoService.deleteNodeI(id, this.list));
+    this.list.update(
+      (list) =>
+        this.demoService.deleteNodeI(id, list) as (FlowOptions & {
+          node: any;
+        })[],
+    );
   }
 
   startLinking(index: number) {
@@ -175,8 +277,8 @@ export class DemoOneComponent implements AfterViewInit {
     } else {
       // Complete the linking
       if (this.linkingFrom !== index) {
-        const fromNode = this.list[this.linkingFrom];
-        const toNode = this.list[index];
+        const fromNode = this.list()[this.linkingFrom];
+        const toNode = this.list()[index];
         fromNode.children.push(toNode.id);
       }
       this.linkingFrom = null;
