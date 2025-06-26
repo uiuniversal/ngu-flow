@@ -3,14 +3,14 @@ import { FlowComponent } from '../flow.component';
 import { FlowPlugin } from './plugin';
 
 const ROOT_DATA = new Map<string, ArrangeNode>();
-const ROOT_DEPS = new Map<string, string[]>();
+const ROOT_CHILDREN = new Map<string, string[]>();
 const HORIZONTAL_PADDING = 100;
 const VERTICAL_PADDING = 20;
 
 export class Arrangements implements FlowPlugin {
   root: string[] = [];
-  data: FlowComponent;
-  private list: ChildInfo[];
+  data!: FlowComponent;
+  private list!: ChildInfo[];
   private direction: FlowDirection = 'vertical';
   public horizontalPadding = 100;
   public verticalPadding = 20;
@@ -44,19 +44,23 @@ export class Arrangements implements FlowPlugin {
     this.groupPadding = this.data.flow.groupPadding;
 
     ROOT_DATA.clear();
-    ROOT_DEPS.clear();
+    ROOT_CHILDREN.clear();
+    const hasParent = new Set<string>();
+    
     for (const item of this.list) {
-      ROOT_DATA.set(
-        item.position.id,
-        new ArrangeNode(item.position, item.elRect),
-      );
-      item.position.deps.forEach((dep) => {
-        let d = ROOT_DEPS.get(dep) || [];
-        d.push(item.position.id);
-        ROOT_DEPS.set(dep, d);
+      ROOT_DATA.set(item.position.id, new ArrangeNode(item.position, item.elRect));
+      ROOT_CHILDREN.set(item.position.id, item.position.children);
+      
+      // Track which nodes have parents
+      item.position.children.forEach((childId) => {
+        hasParent.add(childId);
       });
-
-      if (item.position.deps.length === 0) {
+    }
+    
+    // Root nodes are those without parents
+    this.root = [];
+    for (const item of this.list) {
+      if (!hasParent.has(item.position.id)) {
         this.root.push(item.position.id);
       }
     }
@@ -86,17 +90,17 @@ export class ArrangeNode {
     public elRect: DOMRect,
   ) {}
 
-  get deps() {
-    return ROOT_DEPS.get(this.position.id) || [];
+  get children() {
+    return ROOT_CHILDREN.get(this.position.id) || [];
   }
 
-  // we need to recursively call this method to get all the dependents of the node
+  // we need to recursively call this method to get all the children of the node
   // and then we need to position them
   arrange(sx: number, sy: number, direction: FlowDirection): Coordinates {
-    const dependents = ROOT_DEPS.get(this.position.id) || [];
+    const children = ROOT_CHILDREN.get(this.position.id) || [];
     let startX = sx;
     let startY = sy;
-    let len = dependents.length;
+    let len = children.length;
 
     if (len) {
       if (direction === 'horizontal') {
@@ -107,12 +111,12 @@ export class ArrangeNode {
       let first: Coordinates = { x: 0, y: 0 };
       let last: Coordinates = { x: 0, y: 0 };
       for (let i = 0; i < len; i++) {
-        const dep = dependents[i];
-        const dependent = ROOT_DATA.get(dep)!;
-        const { x, y } = dependent.arrange(startX, startY, direction);
-        // capture the first and last dependent
-        if (i === 0) first = dependent.position;
-        if (i === len - 1) last = dependent.position;
+        const childId = children[i];
+        const child = ROOT_DATA.get(childId)!;
+        const { x, y } = child.arrange(startX, startY, direction);
+        // capture the first and last child
+        if (i === 0) first = child.position;
+        if (i === len - 1) last = child.position;
 
         if (direction === 'horizontal') {
           startY = y + VERTICAL_PADDING;

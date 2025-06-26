@@ -9,12 +9,14 @@ export class FlowOptions {
   x: number;
   y: number;
   id: string;
-  deps: string[];
+  children: string[];
+  data?: any;
   constructor(options: FlowOptions) {
     this.x = options.x;
     this.y = options.y;
     this.id = options.id;
-    this.deps = options.deps;
+    this.children = options.children;
+    this.data = options.data;
   }
 }
 

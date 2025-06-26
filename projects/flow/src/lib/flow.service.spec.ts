@@ -16,14 +16,14 @@ describe('FlowService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should update items and dependencies', () => {
+  it('should update items and parent relationships', () => {
     const flowItems: FlowOptions[] = [
-      { x: 0, y: 0, id: '1', deps: ['2'] },
-      { x: 1, y: 1, id: '2', deps: [] },
+      { x: 0, y: 0, id: '1', children: ['2'] },
+      { x: 1, y: 1, id: '2', children: [] },
     ];
     service.update(flowItems);
 
     expect(service.items.size).toBe(2);
-    expect(service.deps.get('2')).toEqual(['1']);
+    expect(service.parents.get('2')).toEqual(['1']);
   });
 });

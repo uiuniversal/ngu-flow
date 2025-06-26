@@ -20,20 +20,6 @@ import {
 } from '@ngu/flow';
 import { FormsModule } from '@angular/forms';
 import { DemoService } from '../demo/demo.service';
-import {
-  AccessibleGroup,
-  AccessibleItem,
-  Button,
-  ColorInput,
-  ContextMenu,
-  Icon,
-  Input,
-  Key,
-  List,
-  Menu,
-  popoverPortal,
-  Heading,
-} from '@meeui/ui';
 import { provideIcons } from '@ng-icons/core';
 import { lucideRefreshCw, lucideZoomIn, lucideZoomOut } from '@ng-icons/lucide';
 import { convertMermaidToNodeMap, NodeMap } from './mermaid';
@@ -46,23 +32,23 @@ import { convertMermaidToNodeMap, NodeMap } from './mermaid';
     FormsModule,
     FlowComponent,
     FlowChildComponent,
-    Button,
-    Icon,
-    ContextMenu,
-    Menu,
-    List,
-    Key,
-    Input,
-    Heading,
-    ColorInput,
-    AccessibleGroup,
-    AccessibleItem,
+    // Button,
+    // Icon,
+    // ContextMenu,
+    // Menu,
+    // List,
+    // Key,
+    // Input,
+    // Heading,
+    // ColorInput,
+    // AccessibleGroup,
+    // AccessibleItem,
   ],
   viewProviders: [
     provideIcons({ lucideZoomIn, lucideZoomOut, lucideRefreshCw }),
   ],
   template: `
-    <div class="flex h-screen relative">
+    <!-- <div class="flex h-screen relative">
       <div class="flex flex-col w-1/4 p-b4">
         <h4 meeHeader="sm">Mermaid</h4>
         <textarea
@@ -75,7 +61,6 @@ import { convertMermaidToNodeMap, NodeMap } from './mermaid';
       <div
         class="flex flex-col flex-1 items-center justify-center h-screen relative"
       >
-        <!-- Toolbar -->
         <div
           class="flex absolute top-b2 right-b2 bg-foreground z-10 shadow-md rounded-base p-b"
         >
@@ -147,7 +132,7 @@ import { convertMermaidToNodeMap, NodeMap } from './mermaid';
           />
         </ng-template>
       </div>
-    </div>
+    </div> -->
   `,
   styles: [
     `
@@ -170,7 +155,7 @@ import { convertMermaidToNodeMap, NodeMap } from './mermaid';
 export class MindMapComponent {
   readonly demoService = inject(DemoService);
   readonly flowComponent = viewChild.required(FlowComponent);
-  readonly popover = popoverPortal();
+  // readonly popover = popoverPortal();
   readonly presetColors = [
     '#000000',
     '#93c5fd',
@@ -222,17 +207,22 @@ export class MindMapComponent {
     if (event.key === 'Tab' && event.shiftKey) {
       this.list.update((list) => [
         ...list,
-        new NodeMap({ x: 0, y: 0, id: crypto.randomUUID(), deps: [item.id] }),
+        new NodeMap({
+          x: 0,
+          y: 0,
+          id: crypto.randomUUID(),
+          children: [item.id],
+        }),
       ]);
     }
   }
 
   openColorPicker(template: TemplateRef<any>) {
     const targetElement = this.selectedItem!.el.nativeElement;
-    this.popover.open(template, {
-      target: targetElement,
-      position: 'bottom',
-    });
+    // this.popover.open(template, {
+    //   target: targetElement,
+    //   position: 'bottom',
+    // });
   }
 
   colorChange(color: string) {
@@ -261,7 +251,7 @@ export class MindMapComponent {
         this.list.update((list) => {
           const fromNode = list[this.linkingFrom!];
           const toNode = list[index];
-          fromNode.deps.push(toNode.id);
+          fromNode.children.push(toNode.id);
           return [...list];
         });
       }
@@ -283,30 +273,30 @@ export class MindMapComponent {
 }
 
 export const FLOW_LIST: NodeMap[] = [
-  new NodeMap({ x: 0, y: 0, id: '1', deps: [] }),
-  new NodeMap({ x: 300, y: -400, id: '2', deps: ['1'] }),
-  new NodeMap({ x: 300, y: -200, id: '3', deps: ['1'] }),
-  new NodeMap({ x: 300, y: 0, id: '4', deps: ['1'] }),
-  new NodeMap({ x: 300, y: 200, id: '5', deps: ['1'] }),
-  new NodeMap({ x: 300, y: 400, id: '6', deps: ['1'] }),
-  new NodeMap({ x: 600, y: -500, id: '7', deps: ['2'] }),
-  new NodeMap({ x: 600, y: -400, id: '8', deps: ['2'] }),
-  new NodeMap({ x: 600, y: -200, id: '9', deps: ['3'] }),
-  new NodeMap({ x: 600, y: -100, id: '10', deps: ['3'] }),
-  new NodeMap({ x: 600, y: 0, id: '11', deps: ['4'] }),
-  new NodeMap({ x: 600, y: 100, id: '12', deps: ['4'] }),
-  new NodeMap({ x: 600, y: 200, id: '13', deps: ['5'] }),
-  new NodeMap({ x: 600, y: 300, id: '14', deps: ['5'] }),
-  new NodeMap({ x: 600, y: 400, id: '15', deps: ['6'] }),
-  new NodeMap({ x: 600, y: 500, id: '16', deps: ['6'] }),
-  new NodeMap({ x: 900, y: -500, id: '17', deps: ['7'] }),
-  new NodeMap({ x: 900, y: -400, id: '18', deps: ['8'] }),
-  new NodeMap({ x: 900, y: -200, id: '19', deps: ['9'] }),
-  new NodeMap({ x: 900, y: -100, id: '20', deps: ['10'] }),
-  new NodeMap({ x: 900, y: 0, id: '21', deps: ['11'] }),
-  new NodeMap({ x: 900, y: 100, id: '22', deps: ['12'] }),
-  new NodeMap({ x: 900, y: 200, id: '23', deps: ['13'] }),
-  new NodeMap({ x: 900, y: 300, id: '24', deps: ['14'] }),
-  new NodeMap({ x: 900, y: 400, id: '25', deps: ['15'] }),
-  new NodeMap({ x: 900, y: 500, id: '26', deps: ['16'] }),
+  new NodeMap({ x: 0, y: 0, id: '1', children: [] }),
+  new NodeMap({ x: 300, y: -400, id: '2', children: ['1'] }),
+  new NodeMap({ x: 300, y: -200, id: '3', children: ['1'] }),
+  new NodeMap({ x: 300, y: 0, id: '4', children: ['1'] }),
+  new NodeMap({ x: 300, y: 200, id: '5', children: ['1'] }),
+  new NodeMap({ x: 300, y: 400, id: '6', children: ['1'] }),
+  new NodeMap({ x: 600, y: -500, id: '7', children: ['2'] }),
+  new NodeMap({ x: 600, y: -400, id: '8', children: ['2'] }),
+  new NodeMap({ x: 600, y: -200, id: '9', children: ['3'] }),
+  new NodeMap({ x: 600, y: -100, id: '10', children: ['3'] }),
+  new NodeMap({ x: 600, y: 0, id: '11', children: ['4'] }),
+  new NodeMap({ x: 600, y: 100, id: '12', children: ['4'] }),
+  new NodeMap({ x: 600, y: 200, id: '13', children: ['5'] }),
+  new NodeMap({ x: 600, y: 300, id: '14', children: ['5'] }),
+  new NodeMap({ x: 600, y: 400, id: '15', children: ['6'] }),
+  new NodeMap({ x: 600, y: 500, id: '16', children: ['6'] }),
+  new NodeMap({ x: 900, y: -500, id: '17', children: ['7'] }),
+  new NodeMap({ x: 900, y: -400, id: '18', children: ['8'] }),
+  new NodeMap({ x: 900, y: -200, id: '19', children: ['9'] }),
+  new NodeMap({ x: 900, y: -100, id: '20', children: ['10'] }),
+  new NodeMap({ x: 900, y: 0, id: '21', children: ['11'] }),
+  new NodeMap({ x: 900, y: 100, id: '22', children: ['12'] }),
+  new NodeMap({ x: 900, y: 200, id: '23', children: ['13'] }),
+  new NodeMap({ x: 900, y: 300, id: '24', children: ['14'] }),
+  new NodeMap({ x: 900, y: 400, id: '25', children: ['15'] }),
+  new NodeMap({ x: 900, y: 500, id: '26', children: ['16'] }),
 ];

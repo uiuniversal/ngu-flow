@@ -9,9 +9,9 @@ export class FlowService {
   readonly items = new Map<string, FlowOptions>();
   config = new FlowConfig();
   arrowsChange = new Subject<FlowOptions>();
-  deps = new Map<string, string[]>();
-  isDraggingZoomContainer: boolean;
-  isChildDragging: boolean;
+  parents = new Map<string, string[]>();
+  isDraggingZoomContainer!: boolean;
+  isChildDragging!: boolean;
   enableChildDragging = new BehaviorSubject(true);
   enableZooming = new BehaviorSubject(true);
   horizontalPadding = 100;
@@ -22,7 +22,7 @@ export class FlowService {
   panY = 0;
   gridSize = 1;
   arrows: Arrow[] = [];
-  zoomContainer: HTMLElement;
+  zoomContainer!: HTMLElement;
   layoutUpdated = new Subject<void>();
   onMouse = new Subject<MouseEvent>();
 
@@ -39,17 +39,19 @@ export class FlowService {
     this.onMouse.next(event);
   };
 
-  update(children: FlowOptions[]) {
+  update(items: FlowOptions[]) {
     this.items.clear();
-    children.forEach((child) => {
-      this.items.set(child.id, child);
-      child.deps.forEach((dep) => {
-        let d = this.deps.get(dep);
-        if (!d) {
-          d = [];
+    this.parents.clear();
+    items.forEach((item) => {
+      this.items.set(item.id, item);
+      // Build parent mapping from children arrays
+      item.children.forEach((childId) => {
+        let parentList = this.parents.get(childId);
+        if (!parentList) {
+          parentList = [];
         }
-        d.push(child.id);
-        this.deps.set(dep, d);
+        parentList.push(item.id);
+        this.parents.set(childId, parentList);
       });
     });
   }

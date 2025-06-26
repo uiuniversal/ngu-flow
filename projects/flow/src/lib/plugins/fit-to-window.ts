@@ -3,15 +3,15 @@ import { FlowComponent } from '../flow.component';
 import { FlowPlugin } from './plugin';
 
 export class FitToWindow implements FlowPlugin {
-  private cRect: CPosition;
+  private cRect!: CPosition;
   private containerPadding = 0;
-  private data: FlowComponent;
+  private data!: FlowComponent;
 
-  private list: ChildInfo[];
-  private containerRect: DOMRect;
-  private scale: number;
-  private panX: number;
-  private panY: number;
+  private list!: ChildInfo[];
+  private containerRect!: DOMRect;
+  private scale!: number;
+  private panX!: number;
+  private panY!: number;
 
   constructor(private init = false) {}
 
@@ -27,6 +27,8 @@ export class FitToWindow implements FlowPlugin {
   }
 
   fitToWindow() {
+    if (!this.data.list) return;
+
     this.run(
       this.data.list,
       this.data.zoomContainer.nativeElement.getBoundingClientRect(),
@@ -36,13 +38,7 @@ export class FitToWindow implements FlowPlugin {
     );
   }
 
-  run(
-    list: ChildInfo[],
-    cRect: DOMRect,
-    scale: number,
-    panX: number,
-    panY: number,
-  ) {
+  run(list: ChildInfo[], cRect: DOMRect, scale: number, panX: number, panY: number) {
     this.list = list;
     this.containerRect = cRect;
     this.scale = scale;
@@ -72,13 +68,7 @@ export class FitToWindow implements FlowPlugin {
     const adjMaxX = maxX - minX + this.containerPadding;
     const adjMaxY = maxY - minY + this.containerPadding;
     const newScale = Math.min(this._getNewScale(adjMaxX, adjMaxY), 1);
-    const { panX, panY } = this._getPanValues(
-      adjMaxX,
-      adjMaxY,
-      newScale,
-      minX,
-      minY,
-    );
+    const { panX, panY } = this._getPanValues(adjMaxX, adjMaxY, newScale, minX, minY);
     return { scale: newScale, panX, panY };
   }
 
@@ -111,13 +101,7 @@ export class FitToWindow implements FlowPlugin {
     return Math.min(scaleX, scaleY);
   }
 
-  _getPanValues(
-    adjMaxX: number,
-    adjMaxY: number,
-    newScale: number,
-    minX: number,
-    minY: number,
-  ) {
+  _getPanValues(adjMaxX: number, adjMaxY: number, newScale: number, minX: number, minY: number) {
     // Calculate the center point of the scaled content
     const scaledContentWidth = adjMaxX * newScale;
     const scaledContentHeight = adjMaxY * newScale;
@@ -127,10 +111,8 @@ export class FitToWindow implements FlowPlugin {
     const containerCenterY = this.cRect.height / 2;
 
     // Calculate the difference between the container center and the content center
-    const offsetX =
-      containerCenterX - (scaledContentWidth / 2 + minX * newScale);
-    const offsetY =
-      containerCenterY - (scaledContentHeight / 2 + minY * newScale);
+    const offsetX = containerCenterX - (scaledContentWidth / 2 + minX * newScale);
+    const offsetY = containerCenterY - (scaledContentHeight / 2 + minY * newScale);
 
     // Adjust pan values to center the content
     const nPad = (this.containerPadding * newScale) / 2;

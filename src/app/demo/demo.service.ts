@@ -15,7 +15,7 @@ export class DemoService {
       x: 40 + list.length * 160,
       y: 40,
       id: newNodeId,
-      deps: [item.id],
+      children: [item.id],
     };
     list.push(newNode);
   }
@@ -24,13 +24,13 @@ export class DemoService {
     let removeId = [id];
     if (id && list.length > 0) {
       return list.reduce((acc, item) => {
-        const initialLength = item.deps.length;
-        item.deps = item.deps.filter((dep) => !removeId.includes(dep));
-        if (initialLength > 0 && item.deps.length === 0) {
+        const initialLength = item.children.length;
+        item.children = item.children.filter((dep) => !removeId.includes(dep));
+        if (initialLength > 0 && item.children.length === 0) {
           removeId.push(item.id);
         } else if (
           !removeId.includes(item.id) &&
-          (item.deps.length === initialLength || item.deps.length > 0)
+          (item.children.length === initialLength || item.children.length > 0)
         )
           acc.push(item);
         return acc;

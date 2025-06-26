@@ -16,12 +16,7 @@ import {
 import { startWith } from 'rxjs';
 import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
-import {
-  FlowOptions,
-  ChildInfo,
-  FlowDirection,
-  ArrowPathFn,
-} from './flow-interface';
+import { FlowOptions, ChildInfo, FlowDirection, ArrowPathFn } from './flow-interface';
 import { FlowConfig, FlowPlugin } from './plugins/plugin';
 import { Connections } from './plugins/connections';
 
@@ -39,13 +34,13 @@ const BASE_SCALE_AMOUNT = 0.05;
         @if (config.arrows) {
           <marker
             id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
+            [attr.markerWidth]="arrowW"
+            [attr.markerHeight]="arrowH"
             refX="0"
-            refY="3.5"
+            [attr.refY]="refY"
             orient="auto"
           >
-            <polygon points="0 0, 10 3.5, 0 7"></polygon>
+            <polygon [attr.points]="points"></polygon>
           </marker>
         }
       </defs>
@@ -125,22 +120,24 @@ const BASE_SCALE_AMOUNT = 0.05;
     `,
   ],
 })
-export class FlowComponent
-  implements OnInit, AfterContentInit, AfterViewInit, OnDestroy
-{
+export class FlowComponent implements OnInit, AfterContentInit, AfterViewInit, OnDestroy {
   @Input() config: FlowConfig = new FlowConfig();
-  @ContentChildren(FlowChildComponent) children =
-    new QueryList<FlowChildComponent>();
+  @ContentChildren(FlowChildComponent) children = new QueryList<FlowChildComponent>();
 
   // @ViewChildren('arrowPaths') arrowPaths: QueryList<ElementRef<SVGPathElement>>;
-  @ViewChild('zoomContainer') zoomContainer: ElementRef<HTMLDivElement>;
-  @ViewChild('svg') svg: ElementRef<SVGSVGElement>;
-  @ViewChild('g') g: ElementRef<SVGGElement>;
+  @ViewChild('zoomContainer') zoomContainer!: ElementRef<HTMLDivElement>;
+  @ViewChild('svg') svg!: ElementRef<SVGSVGElement>;
+  @ViewChild('g') g!: ElementRef<SVGGElement>;
   // New SVG element for guide lines
-  @ViewChild('guideLines') guideLines: ElementRef<SVGGElement>;
+  @ViewChild('guideLines') guideLines!: ElementRef<SVGGElement>;
   initialX = 0;
   initialY = 0;
   defaultPlugins = [new Connections()];
+
+  arrowW = 10;
+  arrowH = 10;
+  refY = 3.5;
+  points = '0 0, 10 3.5, 0 7';
 
   constructor(
     public el: ElementRef<HTMLElement>,
@@ -152,23 +149,24 @@ export class FlowComponent
     this.flow.zoomContainer = this.el.nativeElement;
     this.config = { ...new FlowConfig(), ...this.config };
     this.flow.config = this.config;
+    this.calculateArrowSize();
     this.flow.arrowsChange.subscribe((e) => this.updateArrows(e));
     this.ngZone.runOutsideAngular(() => {
       this.el.nativeElement.addEventListener('wheel', this._wheelPanning);
 
-      this.el.nativeElement.addEventListener(
-        'mousedown',
-        this._startDraggingZoomContainer,
-      );
-      this.el.nativeElement.addEventListener(
-        'mouseup',
-        this._stopDraggingZoomContainer,
-      );
-      this.el.nativeElement.addEventListener(
-        'mousemove',
-        this._dragZoomContainer,
-      );
+      this.el.nativeElement.addEventListener('mousedown', this._startDraggingZoomContainer);
+      this.el.nativeElement.addEventListener('mouseup', this._stopDraggingZoomContainer);
+      this.el.nativeElement.addEventListener('mousemove', this._dragZoomContainer);
     });
+  }
+
+  calculateArrowSize() {
+    const size = this.config.arrowSize!;
+    const scaleFactor = size / 20;
+    this.arrowW = 10 * scaleFactor;
+    this.arrowH = 7 * scaleFactor;
+    this.refY = 3.5 * scaleFactor;
+    this.points = `0 0, ${this.arrowW} ${this.refY}, 0 ${this.arrowH}`;
   }
 
   ngAfterViewInit(): void {
@@ -189,13 +187,11 @@ export class FlowComponent
   }
 
   ngAfterContentInit() {
-    this.children.changes
-      .pipe(startWith(this.children))
-      .subscribe((children) => {
-        this.flow.update(this.children.map((x) => x.position));
-        this.runPlugin((e) => e.beforeUpdate?.(this));
-        this.createArrows();
-      });
+    this.children.changes.pipe(startWith(this.children)).subscribe((children) => {
+      this.flow.update(this.children.map((x) => x.position));
+      this.runPlugin((e) => e.beforeUpdate?.(this));
+      this.createArrows();
+    });
     requestAnimationFrame(() => this.updateArrows()); // this required for angular to render the dot
   }
 
@@ -350,31 +346,25 @@ export class FlowComponent
     while (gElement.firstChild) {
       gElement.removeChild(gElement.firstChild);
     }
-    // Calculate new arrows
-    this.list.forEach((item) => {
-      item.position.deps.forEach((depId) => {
-        const dep = this.list.find((dep) => dep.position.id === depId);
-        if (dep) {
+    // Calculate new arrows - now iterating through parents to connect to children
+    this.list.forEach((parent) => {
+      parent.position.children.forEach((childId) => {
+        const child = this.list.find((c) => c.position.id === childId);
+        if (child) {
           const arrow = {
-            d: `M${item.position.x},${item.position.y} L${dep.position.x},${dep.position.y}`,
-            deps: [item.position.id, dep.position.id],
+            d: `M${parent.position.x},${parent.position.y} L${child.position.x},${child.position.y}`,
+            deps: [parent.position.id, child.position.id],
             startDot: 0,
             endDot: 0,
-            id: `arrow${item.position.id}-to-${dep.position.id}`,
+            id: `arrow${parent.position.id}-to-${child.position.id}`,
           };
 
           // Create path element and set attributes
-          const pathElement = document.createElementNS(
-            'http://www.w3.org/2000/svg',
-            'path',
-          );
+          const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           pathElement.setAttribute('d', arrow.d);
           pathElement.setAttribute('id', arrow.id);
           pathElement.setAttribute('stroke', 'var(--flow-path-color)');
-          pathElement.setAttribute(
-            'stroke-width',
-            this.config.strokeWidth!.toString(),
-          );
+          pathElement.setAttribute('stroke-width', this.config.strokeWidth!.toString());
           pathElement.setAttribute('fill', 'none');
           pathElement.setAttribute('marker-end', 'url(#arrowhead)');
 

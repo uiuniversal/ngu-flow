@@ -103,20 +103,20 @@ export class DemoTwoComponent implements AfterViewInit {
   };
   config: FlowConfig = {
     arrows: true,
-    arrowSize: 20,
+    arrowSize: 10,
     plugins: this.plugins,
   };
 
   constructor() {
     this.list = [
-      { x: 40, y: 40, id: '1', deps: [] },
-      { x: 40, y: 40, id: '2', deps: ['1'] },
-      { x: 40, y: 40, id: '3', deps: ['2'] },
-      { x: 40, y: 40, id: '4', deps: ['1'] },
-      { x: 40, y: 40, id: '5', deps: ['3'] },
-      { x: 40, y: 40, id: '6', deps: ['2'] },
-      { x: 40, y: 40, id: '7', deps: ['4'] },
-      { x: 40, y: 40, id: '9', deps: ['7'] },
+      { x: 40, y: 40, id: '1', children: ['2', '4'] },
+      { x: 40, y: 40, id: '2', children: ['3', '6'] },
+      { x: 40, y: 40, id: '3', children: ['5'] },
+      { x: 40, y: 40, id: '4', children: ['7'] },
+      { x: 40, y: 40, id: '5', children: [] },
+      { x: 40, y: 40, id: '6', children: [] },
+      { x: 40, y: 40, id: '7', children: ['8'] },
+      { x: 40, y: 40, id: '8', children: [] },
     ];
     // generate a random list of nodes with random dependencies min 100 nodes
     // this.list = [
@@ -180,7 +180,7 @@ export class DemoTwoComponent implements AfterViewInit {
       if (this.linkingFrom !== index) {
         const fromNode = this.list[this.linkingFrom];
         const toNode = this.list[index];
-        fromNode.deps.push(toNode.id);
+        fromNode.children.push(toNode.id);
       }
       this.linkingFrom = null;
     }

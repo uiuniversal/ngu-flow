@@ -63,13 +63,13 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
   private offsetX = 0;
   private offsetY = 0;
 
-  @ViewChildren('dot') dots: QueryList<ElementRef<HTMLDivElement>>;
+  @ViewChildren('dot') dots!: QueryList<ElementRef<HTMLDivElement>>;
 
-  @Input('flowChild') position: FlowOptions;
+  @Input('flowChild') position!: FlowOptions;
 
   private positionChange = new Subject<FlowOptions>();
-  private mouseMoveSubscription: Subscription;
-  private layoutSubscribe: Subscription;
+  private mouseMoveSubscription!: Subscription;
+  private layoutSubscribe!: Subscription;
 
   constructor(
     public el: ElementRef<HTMLDivElement>,
@@ -123,15 +123,11 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
       const cx = event.clientX - zRect.left;
       const cy = event.clientY - zRect.top;
       const x =
-        Math.round(
-          (cx - this.flow.panX - this.offsetX) /
-            (this.flow.gridSize * this.flow.scale),
-        ) * this.flow.gridSize;
+        Math.round((cx - this.flow.panX - this.offsetX) / (this.flow.gridSize * this.flow.scale)) *
+        this.flow.gridSize;
       const y =
-        Math.round(
-          (cy - this.flow.panY - this.offsetY) /
-            (this.flow.gridSize * this.flow.scale),
-        ) * this.flow.gridSize;
+        Math.round((cy - this.flow.panY - this.offsetY) / (this.flow.gridSize * this.flow.scale)) *
+        this.flow.gridSize;
 
       this.position.x = x;
       this.position.y = y;

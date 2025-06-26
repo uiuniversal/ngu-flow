@@ -12,8 +12,8 @@ export class Connections implements FlowPlugin {
   // value = index of the closest dot
   closestDots = new Map<string, number>();
 
-  data: FlowComponent;
-  private list: ChildInfo[];
+  data!: FlowComponent;
+  private list!: ChildInfo[];
   private direction: 'horizontal' | 'vertical' = 'horizontal';
 
   onInit(data: FlowComponent): void {
@@ -31,10 +31,7 @@ export class Connections implements FlowPlugin {
       const fromItem = childObj[from];
       const toItem = childObj[to];
       if (fromItem && toItem) {
-        const [endDotIndex, startDotIndex] = this.getClosestDotsSimplified(
-          toItem,
-          from,
-        );
+        const [endDotIndex, startDotIndex] = this.getClosestDotsSimplified(toItem, from);
 
         const startDot = this.getDotByIndex(
           childObj,
@@ -53,10 +50,10 @@ export class Connections implements FlowPlugin {
           this.data.flow.panY,
         );
 
-        // we need to reverse the path because the arrow head is at the end
+        // Draw arrow from start (parent) to end (child)
         arrow.d = this.data.flow.arrowFn(
-          endDot,
           startDot,
+          endDot,
           this.data.flow.config.arrows ? this.data.flow.config.arrowSize : 0,
           2,
         );
@@ -64,9 +61,7 @@ export class Connections implements FlowPlugin {
 
       // Update the SVG paths
       this.data.flow.arrows.forEach((arrow) => {
-        const pathElement = gElement.querySelector(
-          `#${arrow.id}`,
-        ) as SVGPathElement;
+        const pathElement = gElement.querySelector(`#${arrow.id}`) as SVGPathElement;
         if (pathElement) {
           pathElement.setAttribute('d', arrow.d);
         }
@@ -83,14 +78,9 @@ export class Connections implements FlowPlugin {
     this.setReverseDepsMap(this.list.map((x) => x.position));
   }
 
-  public getClosestDotsSimplified(
-    item: ChildInfo,
-    dep: string,
-  ): [number, number] {
-    const ids = [
-      ...item.position.deps,
-      ...(this.reverseDepsMap.get(item.position.id) || []),
-    ];
+  public getClosestDotsSimplified(item: ChildInfo, dep: string): [number, number] {
+    const parents = this.data.flow.parents.get(item.position.id) || [];
+    const ids = [...item.position.children, ...parents];
     ids.forEach((x) => this.findClosestDot(x, item));
     // ids.forEach((x) => this.findClosestDot(x, item, childObj));
     // Remove duplicates
@@ -117,23 +107,19 @@ export class Connections implements FlowPlugin {
 
     const dep = this.list.find((item) => item.position.id === depId);
     if (dep) {
-      const [closestDotIndex1, closestDotIndex2] =
-        this._findClosestConnectionPoints(item, dep);
+      const [closestDotIndex1, closestDotIndex2] = this._findClosestConnectionPoints(item, dep);
 
       this.closestDots.set(uniqueKey1, closestDotIndex1);
       this.closestDots.set(uniqueKey2, closestDotIndex2);
     }
   }
 
-  public _findClosestConnectionPoints(
-    parent: ChildInfo,
-    child: ChildInfo,
-  ): [number, number] {
+  public _findClosestConnectionPoints(parent: ChildInfo, child: ChildInfo): [number, number] {
     // sides dot index order: [top, right, bottom, left]
     let swapped = false;
     const isV = this.direction === 'vertical';
-    // correct the parent based on the deps
-    if (!child.position.deps.includes(parent.position.id)) {
+    // correct the parent based on the children
+    if (!parent.position.children.includes(child.position.id)) {
       const _t = child;
       child = parent;
       parent = _t;
@@ -193,9 +179,7 @@ export class Connections implements FlowPlugin {
           (key) => key.startsWith(id) && this.closestDots.get(key) === index,
         );
 
-        dot.nativeElement.style.visibility = isClosestForAnyDep
-          ? 'visible'
-          : 'hidden';
+        dot.nativeElement.style.visibility = isClosestForAnyDep ? 'visible' : 'hidden';
       });
     });
   }
@@ -224,12 +208,13 @@ export class Connections implements FlowPlugin {
   }
 
   private setReverseDepsMap(list: FlowOptions[]) {
-    list.forEach((item) => {
-      item.deps.forEach((depId) => {
-        if (!this.reverseDepsMap.has(depId)) {
-          this.reverseDepsMap.set(depId, []);
+    // Build reverse dependency map from children arrays
+    list.forEach((parent) => {
+      parent.children.forEach((childId) => {
+        if (!this.reverseDepsMap.has(childId)) {
+          this.reverseDepsMap.set(childId, []);
         }
-        this.reverseDepsMap.get(depId)!.push(item.id);
+        this.reverseDepsMap.get(childId)!.push(parent.id);
       });
     });
   }

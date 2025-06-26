@@ -7,6 +7,7 @@ export class FlowConfig {
   strokeWidth? = 2;
   plugins: FlowPlugins = {};
   direction?: FlowDirection = 'horizontal';
+  handlePositions?: 'top-bottom' | 'left-right' | 'bottom-top' | 'right-left';
 }
 
 export type FlowPlugins = Record<string, FlowPlugin>;

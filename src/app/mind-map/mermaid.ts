@@ -42,7 +42,7 @@ export function convertMermaidToNodeMap(mermaidString: string): NodeMap[] {
                 x: 0,
                 y: i * 100,
                 id: idMap[sourceId],
-                deps: [],
+                children: [],
               },
               sourceTitle || sourceId,
             ),
@@ -66,7 +66,7 @@ export function convertMermaidToNodeMap(mermaidString: string): NodeMap[] {
                   x: 300,
                   y: i * 100,
                   id: idMap[targetId],
-                  deps: [idMap[sourceMatch![1]]],
+                  children: [idMap[sourceMatch![1]]],
                 },
                 targetTitle || targetId,
                 linkLabel,
@@ -77,8 +77,8 @@ export function convertMermaidToNodeMap(mermaidString: string): NodeMap[] {
               (node) => node.id === idMap[targetId],
             );
             if (targetNode) {
-              if (!targetNode.deps.includes(idMap[sourceMatch![1]])) {
-                targetNode.deps.push(idMap[sourceMatch![1]]);
+              if (!targetNode.children.includes(idMap[sourceMatch![1]])) {
+                targetNode.children.push(idMap[sourceMatch![1]]);
               }
               if (linkLabel && !targetNode.subTitle) {
                 targetNode.subTitle = linkLabel;
