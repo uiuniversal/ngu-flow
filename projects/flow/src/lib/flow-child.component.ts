@@ -11,21 +11,47 @@ import {
   OnChanges,
   SimpleChanges,
   ChangeDetectionStrategy,
+  inject,
 } from '@angular/core';
 import { Subject, Subscription } from 'rxjs';
 import { FlowService } from './flow.service';
-import { FlowOptions } from './flow-interface';
+import { FlowNode } from './flow-interface';
+import { FlowDotDirective } from './dot.directive';
 
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FlowDotDirective],
   selector: '[flowChild]',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<ng-content></ng-content>
-    <div #dot class="dot dot-top"></div>
-    <div #dot class="dot dot-right"></div>
-    <div #dot class="dot dot-bottom"></div>
-    <div #dot class="dot dot-left"></div>`,
+    <div
+      #dot
+      id="top"
+      class="dot dot-top"
+      [flowDot]="position"
+      [dot]="{ id: 'top', type: 'output' }"
+    ></div>
+    <div
+      #dot
+      id="right"
+      class="dot dot-right"
+      [flowDot]="position"
+      [dot]="{ id: 'right', type: 'output' }"
+    ></div>
+    <div
+      #dot
+      id="bottom"
+      class="dot dot-bottom"
+      [flowDot]="position"
+      [dot]="{ id: 'bottom', type: 'output' }"
+    ></div>
+    <div
+      #dot
+      id="left"
+      class="dot dot-left"
+      [flowDot]="position"
+      [dot]="{ id: 'left', type: 'output' }"
+    ></div>`,
   styles: [
     `
       .dot {
@@ -59,28 +85,27 @@ import { FlowOptions } from './flow-interface';
   ],
 })
 export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
+  public el = inject(ElementRef<HTMLDivElement>);
+  private flowService = inject(FlowService);
+  private ngZone = inject(NgZone);
   private isDragging = false;
   private offsetX = 0;
   private offsetY = 0;
 
   @ViewChildren('dot') dots!: QueryList<ElementRef<HTMLDivElement>>;
 
-  @Input('flowChild') position!: FlowOptions;
+  @Input('flowChild') position!: FlowNode;
 
-  private positionChange = new Subject<FlowOptions>();
+  private positionChange = new Subject<FlowNode>();
   private mouseMoveSubscription!: Subscription;
   private layoutSubscribe!: Subscription;
 
-  constructor(
-    public el: ElementRef<HTMLDivElement>,
-    private flow: FlowService,
-    private ngZone: NgZone,
-  ) {
+  constructor() {
     this.el.nativeElement.style.position = 'absolute';
     this.el.nativeElement.style.transformOrigin = '0, 0';
     // track mouse move outside angular
     this.ngZone.runOutsideAngular(() => {
-      this.flow.enableChildDragging.subscribe((x) => {
+      this.flowService.enableChildDragging.subscribe((x) => {
         if (x) {
           this.enableDragging();
         } else {
@@ -89,8 +114,10 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
       });
     });
 
-    this.layoutSubscribe = this.flow.layoutUpdated.subscribe((x) => {
-      this.position = this.flow.items.get(this.position.id) as FlowOptions;
+    this.layoutSubscribe = this.flowService.layoutUpdated.subscribe((x) => {
+      this.position = this.flowService.items.get(
+        this.position.id,
+      ) as FlowNode;
       this.positionChange.next(this.position);
     });
 
@@ -102,13 +129,13 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
   private onMouseUp = (event: MouseEvent) => {
     event.stopPropagation();
     this.isDragging = false;
-    this.flow.isChildDragging = false;
+    this.flowService.isChildDragging = false;
   };
 
   private onMouseDown = (event: MouseEvent) => {
     event.stopPropagation();
     this.isDragging = true;
-    this.flow.isChildDragging = true;
+    this.flowService.isChildDragging = true;
     const rect = this.el.nativeElement.getBoundingClientRect();
     this.offsetX = event.clientX - rect.x;
     this.offsetY = event.clientY - rect.y;
@@ -119,29 +146,31 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
     event.preventDefault();
     if (this.isDragging) {
       event.stopPropagation();
-      const zRect = this.flow.zRect;
+      const zRect = this.flowService.zRect;
       const cx = event.clientX - zRect.left;
       const cy = event.clientY - zRect.top;
       const x =
         Math.round(
-          (cx - this.flow.panX - this.offsetX) /
-            (this.flow.gridSize * this.flow.scale),
-        ) * this.flow.gridSize;
+          (cx - this.flowService.panX - this.offsetX) /
+            (this.flowService.gridSize * this.flowService.scale),
+        ) * this.flowService.gridSize;
       const y =
         Math.round(
-          (cy - this.flow.panY - this.offsetY) /
-            (this.flow.gridSize * this.flow.scale),
-        ) * this.flow.gridSize;
+          (cy - this.flowService.panY - this.offsetY) /
+            (this.flowService.gridSize * this.flowService.scale),
+        ) * this.flowService.gridSize;
 
       this.position.x = x;
       this.position.y = y;
       this.positionChange.next(this.position);
-      this.flow.arrowsChange.next(this.position);
+      this.flowService.arrowsChange.next(this.position);
     }
   };
 
   private enableDragging() {
-    this.mouseMoveSubscription = this.flow.onMouse.subscribe(this.onMouseMove);
+    this.mouseMoveSubscription = this.flowService.onMouse.subscribe(
+      this.onMouseMove,
+    );
     this.el.nativeElement.addEventListener('mouseup', this.onMouseUp);
     this.el.nativeElement.addEventListener('mousedown', this.onMouseDown);
   }

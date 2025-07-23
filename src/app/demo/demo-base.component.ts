@@ -7,18 +7,18 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: ` <div class="flex gap-2 p-2">
+      <a class="p-2 rounded" routerLinkActive="bg-gray-200" routerLink="/demo">
+        Simple Demo
+      </a>
+      <a class="p-2 rounded" routerLinkActive="bg-gray-200" routerLink="/demo-one">
+        Default Dots Demo
+      </a>
       <a class="p-2 rounded" routerLinkActive="bg-gray-200" routerLink="/chain">
-        Chain
+        Custom Dots Demo
       </a>
-      <a class="p-2 rounded" routerLinkActive="bg-gray-200" routerLink="/one">
-        Demo One
+      <a class="p-2 rounded" routerLinkActive="bg-gray-200" routerLink="/svg">
+        SVG Demo
       </a>
-      <a class="p-2 rounded" routerLinkActive="bg-gray-200" routerLink="/two">
-        Demo Two
-      </a>
-      <!-- <a class="p-2 rounded" routerLinkActive="bg-gray-200" routerLink="/svg">
-        Svg
-      </a> -->
     </div>
     <router-outlet />`,
 })

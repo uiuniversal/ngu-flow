@@ -31,13 +31,21 @@ export class SimpleTreeLayout implements LayoutAlgorithm {
       });
     });
 
+    // Preserve original order when filtering roots
     const roots = nodes.filter((node) => !hasParent.has(node.id));
 
     // Arrange each tree
     const isHorizontal = options.direction === 'horizontal';
     let currentOffset = 0;
 
-    roots.forEach((root) => {
+    // Sort roots to maintain original order from the input nodes array
+    const sortedRoots = roots.sort((a, b) => {
+      const indexA = a.originalIndex ?? 0;
+      const indexB = b.originalIndex ?? 0;
+      return indexA - indexB;
+    });
+
+    sortedRoots.forEach((root) => {
       const startX = isHorizontal ? currentOffset : 0;
       const startY = isHorizontal ? 0 : currentOffset;
 
@@ -169,7 +177,16 @@ export class SimpleTreeLayout implements LayoutAlgorithm {
         | { x: number; y: number; width: number; height: number }
         | undefined;
 
-      children.forEach((childId, index) => {
+      // Sort children to maintain original order from the input nodes array
+      const sortedChildren = children.sort((a, b) => {
+        const nodeA = this.nodeMap.get(a);
+        const nodeB = this.nodeMap.get(b);
+        const indexA = nodeA?.originalIndex ?? 0;
+        const indexB = nodeB?.originalIndex ?? 0;
+        return indexA - indexB;
+      });
+
+      sortedChildren.forEach((childId, index) => {
         const childEndPos = this.arrangeNode(childId, nextX, nextY, options);
         const childNode = this.nodeMap.get(childId)!;
         const childPos = this.positions.get(childId)!;
@@ -181,7 +198,7 @@ export class SimpleTreeLayout implements LayoutAlgorithm {
             height: childNode.height,
           };
         }
-        if (index === children.length - 1) {
+        if (index === sortedChildren.length - 1) {
           lastChild = {
             ...childPos,
             width: childNode.width,

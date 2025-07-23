@@ -137,7 +137,10 @@ export class SnapGrid implements FlowPlugin {
   }
 
   private createPattern(): SVGPatternElement {
-    const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+    const pattern = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'pattern',
+    );
     pattern.setAttribute('id', this.patternId);
     pattern.setAttribute('x', '0');
     pattern.setAttribute('y', '0');
@@ -146,7 +149,10 @@ export class SnapGrid implements FlowPlugin {
     pattern.setAttribute('patternUnits', 'userSpaceOnUse');
 
     if (this.options.style === 'dots') {
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      const circle = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'circle',
+      );
       circle.setAttribute('cx', '1');
       circle.setAttribute('cy', '1');
       circle.setAttribute('r', '1');
@@ -155,8 +161,14 @@ export class SnapGrid implements FlowPlugin {
       pattern.appendChild(circle);
     } else {
       // Lines style
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', `M ${this.options.size} 0 L 0 0 0 ${this.options.size}`);
+      const path = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'path',
+      );
+      path.setAttribute(
+        'd',
+        `M ${this.options.size} 0 L 0 0 0 ${this.options.size}`,
+      );
       path.setAttribute('fill', 'none');
       path.setAttribute('stroke', this.options.color);
       path.setAttribute('stroke-width', '0.5');

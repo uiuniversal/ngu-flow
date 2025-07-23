@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { FlowComponent, FlowOptions } from '@ngu/flow';
+import { FlowComponent, FlowNode, FlowEdge } from '@ngu/flow';
 
 @Injectable({ providedIn: 'root' })
 export class DemoService {
@@ -7,35 +7,35 @@ export class DemoService {
 
   constructor() {}
 
-  addNode(item: FlowOptions, list: FlowOptions[]) {
+  addNode(targetNode: FlowNode, nodesList: FlowNode[], edgesList: FlowEdge[]) {
     // find the highest id
-    const lastId = list.reduce((acc, cur) => Math.max(+cur.id, acc), 0);
+    const lastId = nodesList.reduce((acc, cur) => Math.max(+cur.id, acc), 0);
     const newNodeId = (lastId + 1).toString();
-    const newNode: FlowOptions = {
-      x: 40 + list.length * 160,
+    const newNode: FlowNode = {
+      x: 40 + nodesList.length * 160,
       y: 40,
       id: newNodeId,
-      children: [item.id],
     };
-    list.push(newNode);
+    nodesList.push(newNode);
+
+    // Create edge from new node to target node
+    const newEdge: FlowEdge = {
+      id: `edge-${newNodeId}-${targetNode.id}`,
+      source: newNodeId,
+      target: targetNode.id,
+    };
+    edgesList.push(newEdge);
   }
 
-  deleteNodeI(id: string, list: FlowOptions[]) {
-    let removeId = [id];
-    if (id && list.length > 0) {
-      return list.reduce((acc, item) => {
-        const initialLength = item.children.length;
-        item.children = item.children.filter((dep) => !removeId.includes(dep));
-        if (initialLength > 0 && item.children.length === 0) {
-          removeId.push(item.id);
-        } else if (
-          !removeId.includes(item.id) &&
-          (item.children.length === initialLength || item.children.length > 0)
-        )
-          acc.push(item);
-        return acc;
-      }, [] as FlowOptions[]);
-    }
-    return list;
+  deleteNode(id: string, nodesList: FlowNode[], edgesList: FlowEdge[]) {
+    // Remove the node
+    const updatedNodes = nodesList.filter((node) => node.id !== id);
+
+    // Remove all edges connected to this node
+    const updatedEdges = edgesList.filter(
+      (edge) => edge.source !== id && edge.target !== id,
+    );
+
+    return { nodes: updatedNodes, edges: updatedEdges };
   }
 }

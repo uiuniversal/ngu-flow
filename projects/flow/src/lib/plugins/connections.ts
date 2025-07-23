@@ -1,9 +1,30 @@
-import { ChildInfo, DotOptions, FlowOptions } from '../flow-interface';
+import {
+  ChildInfo,
+  DotOptions,
+  FlowNode,
+  FlowEdge,
+  Arrow,
+  Dot,
+  ArrowPathFn,
+  resolveConnectionMode,
+} from '../flow-interface';
 import { FlowChildComponent } from '../flow-child.component';
 import { FlowComponent } from '../flow.component';
 import { FlowPlugin } from './plugin';
-import { Arrow } from '../flow.service';
+import { blendCorners } from '../svg';
 
+/**
+ * Connections plugin supporting flexible and strict connection modes.
+ * 
+ * Mode Priority (highest to lowest):
+ * 1. Edge-level mode (edge.mode)
+ * 2. Config-level mode (config.connectionMode) 
+ * 3. Default ('flexible')
+ * 
+ * Modes:
+ * - 'flexible' (default): Arrows adapt their connection points based on node positions
+ * - 'strict': Arrows maintain fixed connection points regardless of node movement
+ */
 export class Connections implements FlowPlugin {
   // key = id of the item
   // value = ids of the items that depend on it
@@ -12,6 +33,7 @@ export class Connections implements FlowPlugin {
   // key = id of the item
   // value = index of the closest dot
   closestDots = new Map<string, number>();
+  arrowFn: ArrowPathFn = blendCorners;
 
   data!: FlowComponent;
   private list!: ChildInfo[];
@@ -19,22 +41,171 @@ export class Connections implements FlowPlugin {
 
   onInit(data: FlowComponent): void {
     this.setData(data);
+    this.data.flow.startConnection.subscribe(({ event, fromNode, fromDot }) => {
+      console.log('startConnection', fromDot);
+      this._startDraggingConnection(event, fromNode, fromDot);
+    });
+    this.data.flow.endConnection.subscribe(({ event, toNode, toDot }) => {
+      this._stopDraggingConnection(event, toNode, toDot);
+    });
+
+    // Subscribe to layout updates to refresh connections
+    this.data.flow.layoutUpdated.subscribe(() => {
+      console.log('Layout updated, refreshing connections');
+      this.createArrows();
+    });
   }
+
+  onMouseUp(data: FlowComponent, _event: MouseEvent): void {
+    this.setData(data);
+    if (this.data.flow.isDraggingConnection) {
+      // Reset connection drag if mouseup happens outside a valid target dot
+      this.data.flow.isDraggingConnection = false;
+      this.data.flow.connectionDrag = null;
+
+      const tempPath =
+        this.data.g.nativeElement.querySelector('#temp-connection');
+      if (tempPath) {
+        this.data.g.nativeElement.removeChild(tempPath);
+      }
+    }
+  }
+
+  onMouseMove(data: FlowComponent, event: MouseEvent): void {
+    if (this.data.flow.isDraggingConnection) {
+      event.preventDefault();
+      this.setData(data);
+      // console.log(
+      //   'onMouseMove',
+      //   event,
+      //   this.data.flowService.isDraggingConnection,
+      // );
+      const tempPath =
+        this.data.g.nativeElement.querySelector('#temp-connection');
+      if (tempPath) {
+        console.log('tempPath found', tempPath);
+        const { fromNode, fromDot } = this.data.flow.connectionDrag!;
+        const fromDotElement = this.data.g.nativeElement.querySelector(
+          `#${fromDot.id}`,
+        );
+        if (fromDotElement) {
+          // console.log('fromDotElement found', fromDotElement);
+          const fromRect = fromDotElement.getBoundingClientRect();
+          const { left, top } = this.data.flow.zRect;
+          const startX =
+            (fromRect.x + fromRect.width / 2 - this.data.flow.panX - left) /
+            this.data.flow.scale;
+          const startY =
+            (fromRect.y + fromRect.height / 2 - this.data.flow.panY - top) /
+            this.data.flow.scale;
+          const endX = (event.clientX - left) / this.data.flow.scale;
+          const endY = (event.clientY - top) / this.data.flow.scale;
+
+          // console.log('Coordinates:', { startX, startY, endX, endY });
+
+          const tempEndDot: DotOptions = {
+            x: endX,
+            y: endY,
+            id: 'temp',
+            dotIndex: -1,
+          };
+
+          const d = this.arrowFn(
+            {
+              ...fromNode,
+              x: startX,
+              y: startY,
+              dotIndex:
+                fromDot.id === 'top'
+                  ? 0
+                  : fromDot.id === 'right'
+                    ? 1
+                    : fromDot.id === 'bottom'
+                      ? 2
+                      : 3,
+            },
+            tempEndDot,
+            this.data.flow.config.arrows ? this.data.flow.config.arrowSize : 0,
+            this.data.config.strokeWidth!,
+          );
+          tempPath.setAttribute('d', d);
+        }
+      }
+    }
+  }
+
+  public _startDraggingConnection = (
+    _event: MouseEvent,
+    fromNode: FlowNode,
+    fromDot: Dot,
+  ) => {
+    if (fromDot.type !== 'output') return;
+
+    this.data.flow.isDraggingConnection = true;
+    this.data.flow.connectionDrag = { fromNode, fromDot };
+
+    const tempPath = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'path',
+    );
+    tempPath.setAttribute('id', 'temp-connection');
+    tempPath.setAttribute('stroke', 'var(--flow-path-color)');
+    tempPath.setAttribute(
+      'stroke-width',
+      this.data.config.strokeWidth!.toString(),
+    );
+    tempPath.setAttribute('fill', 'none');
+    this.data.g.nativeElement.appendChild(tempPath);
+  };
+
+  public _stopDraggingConnection = (
+    _event: MouseEvent,
+    toNode: FlowNode,
+    toDot: Dot,
+  ) => {
+    if (!this.data.flow.isDraggingConnection || toDot.type !== 'input') return;
+
+    const { fromNode, fromDot } = this.data.flow.connectionDrag!;
+    if (fromNode.id !== toNode.id) {
+      const newEdge: FlowEdge = {
+        id: `edge-${fromNode.id}-${toNode.id}-${Date.now()}`,
+        source: fromNode.id,
+        target: toNode.id,
+        sourcePort: fromDot.id,
+        targetPort: toDot.id,
+      };
+      // Add edge to FlowService
+      this.data.flow.edges.set(newEdge.id, newEdge);
+      // Update parent mapping
+      this.data.flow.updateEdges(Array.from(this.data.flow.edges.values()));
+      this.data.runPlugin((p) => p.onChange?.(this.data));
+    }
+
+    this.data.flow.isDraggingConnection = false;
+    this.data.flow.connectionDrag = null;
+
+    const tempPath =
+      this.data.g.nativeElement.querySelector('#temp-connection');
+    if (tempPath) {
+      this.data.g.nativeElement.removeChild(tempPath);
+    }
+  };
 
   onChange(data: FlowComponent): void {
     this.setData(data);
     this.createArrows();
   }
 
-  beforeUpdate(data: FlowComponent): void {
+  beforeUpdate(_data: FlowComponent): void {
     this.closestDots.clear();
   }
 
-  onNodeChange(data: FlowComponent, node: FlowOptions): void {
+  onNodeChange(data: FlowComponent, node: FlowNode): void {
     this.data = data;
     this.list = data.list;
     const nodeId = node.id;
 
+    // Find all arrows that involve this node (either as source or target)
     const arrowsToUpdate = this.data.flow.arrows.filter((arrow) =>
       arrow.deps.includes(nodeId),
     );
@@ -46,14 +217,20 @@ export class Connections implements FlowPlugin {
       this.closestDots.delete(`${to}-${from}`);
     });
 
+    // Update arrow paths - now uses stored dot indices instead of recalculating
     arrowsToUpdate.forEach((arrow) => this.updateArrowPath(arrow));
     this.updateDotVisibility(this.data.oldChildObj());
   }
 
   afterUpdate(data: FlowComponent): void {
     this.setData(data);
+    // Instead of updating individual arrows using old logic, recreate all arrows
+    this.createArrows();
+  }
+
+  updateArrowFn(fn: ArrowPathFn) {
+    this.arrowFn = fn;
     this.data.flow.arrows.forEach((arrow) => this.updateArrowPath(arrow));
-    this.updateDotVisibility(this.data.oldChildObj());
   }
 
   private updateArrowPath(arrow: Arrow) {
@@ -64,10 +241,27 @@ export class Connections implements FlowPlugin {
     const toItem = childObj[to];
 
     if (fromItem && toItem) {
-      const [endDotIndex, startDotIndex] = this.getClosestDotsSimplified(
-        toItem,
-        from,
-      );
+      let startDotIndex = arrow.startDot;
+      let endDotIndex = arrow.endDot;
+      
+      // If in flexible mode and no custom ports, recalculate optimal dots
+      if (arrow.mode === 'flexible' && !arrow.output && !arrow.input) {
+        const dx = toItem.position.x - fromItem.position.x;
+        const dy = toItem.position.y - fromItem.position.y;
+
+        // Recalculate optimal connection points based on current positions
+        if (Math.abs(dx) > Math.abs(dy)) {
+          startDotIndex = dx > 0 ? 1 : 3; // right or left
+          endDotIndex = dx > 0 ? 3 : 1;   // left or right (opposite)
+        } else {
+          startDotIndex = dy > 0 ? 2 : 0; // bottom or top
+          endDotIndex = dy > 0 ? 0 : 2;   // top or bottom (opposite)
+        }
+        
+        // Update arrow's stored dot indices for consistency
+        arrow.startDot = startDotIndex;
+        arrow.endDot = endDotIndex;
+      }
 
       const startDot = this.getDotByIndex(
         childObj,
@@ -76,6 +270,7 @@ export class Connections implements FlowPlugin {
         this.data.flow.scale,
         this.data.flow.panX,
         this.data.flow.panY,
+        arrow.output,
       );
       const endDot = this.getDotByIndex(
         childObj,
@@ -84,14 +279,15 @@ export class Connections implements FlowPlugin {
         this.data.flow.scale,
         this.data.flow.panX,
         this.data.flow.panY,
+        arrow.input,
       );
 
-      // Draw arrow from start (parent) to end (child)
-      arrow.d = this.data.flow.arrowFn(
+      // Draw arrow from start (source) to end (target)
+      arrow.d = this.arrowFn(
         startDot,
         endDot,
         this.data.flow.config.arrows ? this.data.flow.config.arrowSize : 0,
-        2,
+        this.data.config.strokeWidth!,
       );
     }
 
@@ -105,10 +301,11 @@ export class Connections implements FlowPlugin {
   }
 
   createArrows() {
+    console.log('connections createArrows');
+
     if (!this.data.g) {
       return;
     }
-    console.log('createArrows');
     // Clear existing arrows
     this.data.flow.arrows = [];
     const gElement: SVGGElement = this.data.g.nativeElement;
@@ -116,43 +313,158 @@ export class Connections implements FlowPlugin {
     while (gElement.firstChild) {
       gElement.removeChild(gElement.firstChild);
     }
-    // Calculate new arrows - now iterating through parents to connect to children
-    this.list.forEach((parent) => {
-      parent.position.children.forEach((childId) => {
-        const child = this.list.find((c) => c.position.id === childId);
-        if (child) {
-          const arrow: Arrow = {
-            d: `M${parent.position.x},${parent.position.y} L${child.position.x},${child.position.y}`,
-            deps: [parent.position.id, child.position.id],
-            startDot: 0,
-            endDot: 0,
-            id: `arrow${parent.position.id}-to-${child.position.id}`,
-          };
 
-          // Create path element and set attributes
-          const pathElement = document.createElementNS(
-            'http://www.w3.org/2000/svg',
-            'path',
+    // Create arrows from edges
+    const edges = Array.from(this.data.flow.edges.values());
+    if (!edges || edges.length === 0) {
+      console.warn('No edges to create arrows for');
+      return;
+    }
+    edges.forEach((edge) => {
+      const sourceNode = this.list.find((n) => n.position.id === edge.source);
+      const targetNode = this.list.find((n) => n.position.id === edge.target);
+
+      if (sourceNode && targetNode) {
+        let startDot: DotOptions;
+        let endDot: DotOptions;
+        let sourceDotIndex = 0;
+        let targetDotIndex = 0;
+
+        if (edge.sourcePort && edge.targetPort) {
+          // Use custom dots with specific IDs
+          // First, find the actual dot indices for the custom dots
+          const childObj = this.data.oldChildObj();
+          const sourceChild = childObj[sourceNode.position.id];
+          const targetChild = childObj[targetNode.position.id];
+
+          // Find the index of the custom dots by their IDs
+          const sourceDots = sourceChild?.dots?.toArray() || [];
+          const targetDots = targetChild?.dots?.toArray() || [];
+
+          sourceDotIndex = sourceDots.findIndex(
+            (dot) => dot.nativeElement.id === edge.sourcePort,
           );
-          pathElement.setAttribute('d', arrow.d);
-          pathElement.setAttribute('id', arrow.id);
-          pathElement.setAttribute('stroke', 'var(--flow-path-color)');
-          pathElement.setAttribute(
-            'stroke-width',
-            this.data.config.strokeWidth!.toString(),
+          targetDotIndex = targetDots.findIndex(
+            (dot) => dot.nativeElement.id === edge.targetPort,
           );
-          pathElement.setAttribute('fill', 'none');
-          if (this.data.config.arrows) {
-            pathElement.setAttribute('marker-end', 'url(#arrowhead)');
+
+          // If custom dots not found, use directional logic as fallback
+          if (sourceDotIndex === -1 || targetDotIndex === -1) {
+            console.warn(
+              `Custom dots not found! sourcePort: ${edge.sourcePort} (index: ${sourceDotIndex}), targetPort: ${edge.targetPort} (index: ${targetDotIndex})`,
+            );
+
+            // Fall back to directional logic
+            const dx = targetNode.position.x - sourceNode.position.x;
+            const dy = targetNode.position.y - sourceNode.position.y;
+
+            if (sourceDotIndex === -1) {
+              sourceDotIndex =
+                Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0;
+            }
+            if (targetDotIndex === -1) {
+              targetDotIndex =
+                Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 1) : dy > 0 ? 0 : 2;
+            }
           }
 
-          // Append path to <g> element
-          gElement.appendChild(pathElement);
+          startDot = this.getDotByIndex(
+            this.data.getChildInfo(),
+            sourceNode.position,
+            sourceDotIndex,
+            this.data.flow.scale,
+            this.data.flow.panX,
+            this.data.flow.panY,
+            edge.sourcePort,
+          );
+          endDot = this.getDotByIndex(
+            this.data.getChildInfo(),
+            targetNode.position,
+            targetDotIndex,
+            this.data.flow.scale,
+            this.data.flow.panX,
+            this.data.flow.panY,
+            edge.targetPort,
+          );
+        } else {
+          // Use simple directional logic for default dots
+          // Determine direction based on position
+          const dx = targetNode.position.x - sourceNode.position.x;
+          const dy = targetNode.position.y - sourceNode.position.y;
 
-          this.data.flow.arrows.push(arrow);
+          // Source dot: point towards target
+          if (Math.abs(dx) > Math.abs(dy)) {
+            sourceDotIndex = dx > 0 ? 1 : 3; // right or left
+          } else {
+            sourceDotIndex = dy > 0 ? 2 : 0; // bottom or top
+          }
+
+          // Target dot: point towards source (opposite)
+          if (Math.abs(dx) > Math.abs(dy)) {
+            targetDotIndex = dx > 0 ? 3 : 1; // left or right (opposite)
+          } else {
+            targetDotIndex = dy > 0 ? 0 : 2; // top or bottom (opposite)
+          }
+
+          startDot = this.getDotByIndex(
+            this.data.getChildInfo(),
+            sourceNode.position,
+            sourceDotIndex,
+            this.data.flow.scale,
+            this.data.flow.panX,
+            this.data.flow.panY,
+          );
+          endDot = this.getDotByIndex(
+            this.data.getChildInfo(),
+            targetNode.position,
+            targetDotIndex,
+            this.data.flow.scale,
+            this.data.flow.panX,
+            this.data.flow.panY,
+          );
         }
-      });
+
+        const arrow: Arrow = {
+          d: this.arrowFn(
+            startDot,
+            endDot,
+            this.data.flow.config.arrows ? this.data.flow.config.arrowSize : 0,
+            this.data.config.strokeWidth!,
+          ),
+          deps: [edge.source, edge.target],
+          id: edge.id,
+          output: edge.sourcePort || undefined, // Leave undefined for default dots to avoid ID conflicts
+          input: edge.targetPort || undefined,   // Leave undefined for default dots to avoid ID conflicts
+          startDot: sourceDotIndex,
+          endDot: targetDotIndex,
+          mode: resolveConnectionMode(edge, this.data.flow.getConfig()), // Use priority resolver
+        };
+
+        // Create path element and set attributes
+        const pathElement = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'path',
+        );
+        pathElement.setAttribute('d', arrow.d);
+        pathElement.setAttribute('id', arrow.id);
+        pathElement.setAttribute('stroke', 'var(--flow-path-color)');
+        pathElement.setAttribute(
+          'stroke-width',
+          this.data.config.strokeWidth!.toString(),
+        );
+        pathElement.setAttribute('fill', 'none');
+        if (this.data.config.arrows) {
+          pathElement.setAttribute('marker-end', 'url(#arrowhead)');
+        }
+
+        // Append path to <g> element
+        gElement.appendChild(pathElement);
+        this.data.flow.arrows.push(arrow);
+      }
     });
+
+    // Update dot visibility after creating arrows
+    this.updateDotVisibility(this.data.oldChildObj());
   }
 
   private setData(data: FlowComponent) {
@@ -167,16 +479,22 @@ export class Connections implements FlowPlugin {
     dep: string,
   ): [number, number] {
     const parents = this.data.flow.parents.get(item.position.id) || [];
-    const ids = [...item.position.children, ...parents];
+    const edges = Array.from(this.data.flow.edges.values());
+    const children = edges
+      .filter((edge) => edge.source === item.position.id)
+      .map((edge) => edge.target);
+    const ids = [...parents, ...children];
     ids.forEach((x) => this.findClosestDot(x, item));
     // ids.forEach((x) => this.findClosestDot(x, item, childObj));
     // Remove duplicates
     // const uniqueClosestDotIndices = Array.from(new Set(closestDotIndices));
 
-    return [
-      this.closestDots.get(`${item.position.id}-${dep}`) as number,
-      this.closestDots.get(`${dep}-${item.position.id}`) as number,
-    ];
+    const targetDotIndex =
+      this.closestDots.get(`${item.position.id}-${dep}`) ?? 1; // default to right
+    const sourceDotIndex =
+      this.closestDots.get(`${dep}-${item.position.id}`) ?? 3; // default to left
+
+    return [targetDotIndex, sourceDotIndex];
     // return dep
     //   ? [this.closestDots.get(`${item.id}-${dep}`) as number, this.closestDots.get(`${dep}-${item.id}`) as number]
     //   : closestDotIndices;
@@ -209,8 +527,18 @@ export class Connections implements FlowPlugin {
     // sides dot index order: [top, right, bottom, left]
     let swapped = false;
     const isV = this.direction === 'vertical';
-    // correct the parent based on the children
-    if (!parent.position.children.includes(child.position.id)) {
+    // Check if we need to swap based on actual connection direction
+    const edges = Array.from(this.data.flow.edges.values());
+    const hasEdgeFromParentToChild = edges.some(
+      (edge) =>
+        edge.source === parent.position.id && edge.target === child.position.id,
+    );
+    const hasEdgeFromChildToParent = edges.some(
+      (edge) =>
+        edge.source === child.position.id && edge.target === parent.position.id,
+    );
+
+    if (!hasEdgeFromParentToChild && hasEdgeFromChildToParent) {
       const _t = child;
       child = parent;
       parent = _t;
@@ -248,42 +576,131 @@ export class Connections implements FlowPlugin {
   }
 
   private updateDotVisibility(childObj: Record<string, FlowChildComponent>) {
-    // Object.keys(childObj).forEach((id) => {
     for (const id in childObj) {
       const child = childObj[id];
       const dots = child.dots.toArray();
 
-      // dots.forEach((dot, index) => {
       for (let index = 0; index < dots.length; index++) {
         const dot = dots[index];
-        // Check if the current dot is the closest for any dependency
-        const isClosestForAnyDep = Array.from(this.closestDots.keys()).some(
-          (key) => key.startsWith(id) && this.closestDots.get(key) === index,
+
+        // Check if this dot is used in any edge (for custom dots)
+        const dotId = dot.nativeElement.id;
+        const edges = Array.from(this.data.flow.edges.values());
+        const isUsedInEdge = edges.some(
+          (edge) => edge.sourcePort === dotId || edge.targetPort === dotId,
         );
 
-        dot.nativeElement.style.visibility = isClosestForAnyDep
-          ? 'visible'
-          : 'hidden';
+        // Check if this dot is used for default connections (consider mode)
+        const isUsedForDefaultConnection = edges.some((edge) => {
+          if (edge.sourcePort || edge.targetPort) {
+            // Skip custom dot edges
+            return false;
+          }
+
+          const sourceNode = this.list.find(
+            (n) => n.position.id === edge.source,
+          );
+          const targetNode = this.list.find(
+            (n) => n.position.id === edge.target,
+          );
+
+          if (!sourceNode || !targetNode) return false;
+
+          const mode = resolveConnectionMode(edge, this.data.flow.getConfig());
+          let sourceDotIndex, targetDotIndex;
+
+          if (mode === 'flexible') {
+            // For flexible mode, use current optimal dots based on positions
+            const dx = targetNode.position.x - sourceNode.position.x;
+            const dy = targetNode.position.y - sourceNode.position.y;
+
+            // Source dot: point towards target
+            if (Math.abs(dx) > Math.abs(dy)) {
+              sourceDotIndex = dx > 0 ? 1 : 3; // right or left
+            } else {
+              sourceDotIndex = dy > 0 ? 2 : 0; // bottom or top
+            }
+
+            // Target dot: point towards source (opposite)
+            if (Math.abs(dx) > Math.abs(dy)) {
+              targetDotIndex = dx > 0 ? 3 : 1; // left or right (opposite)
+            } else {
+              targetDotIndex = dy > 0 ? 0 : 2; // top or bottom (opposite)
+            }
+          } else {
+            // For strict mode, use the stored arrow dot indices
+            const arrow = this.data.flow.arrows.find(a => a.id === edge.id);
+            if (arrow) {
+              sourceDotIndex = arrow.startDot;
+              targetDotIndex = arrow.endDot;
+            } else {
+              // Fallback to original calculation if arrow not found
+              const dx = targetNode.position.x - sourceNode.position.x;
+              const dy = targetNode.position.y - sourceNode.position.y;
+              sourceDotIndex = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+              targetDotIndex = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 1) : (dy > 0 ? 0 : 2);
+            }
+          }
+
+          // Check if this dot is used as source or target
+          return (
+            (edge.source === id && index === sourceDotIndex) ||
+            (edge.target === id && index === targetDotIndex)
+          );
+        });
+
+        // Show dot if it's used in an edge or for default connections
+        dot.nativeElement.style.visibility =
+          isUsedInEdge || isUsedForDefaultConnection ? 'visible' : 'hidden';
       }
     }
   }
 
   private getDotByIndex(
-    childObj: Record<string, ChildInfo>,
-    item: FlowOptions,
+    _childObj: Record<string, ChildInfo>,
+    item: FlowNode,
     dotIndex: number,
     scale: number,
     panX: number,
     panY: number,
+    dotId?: string,
   ): DotOptions {
-    const child = childObj[item.id];
-    const childDots = child.dots as DOMRect[];
-    // Make sure the dot index is within bounds
-    if (dotIndex < 0 || dotIndex >= childDots.length) {
-      throw new Error(`Invalid dot index: ${dotIndex}`);
+    let rect: DOMRect;
+
+    if (dotId) {
+      // Always get fresh position for custom dots
+      const dotElement = document.querySelector(`#${dotId}`);
+      if (dotElement) {
+        rect = dotElement.getBoundingClientRect();
+      } else {
+        // Fallback: get fresh dot positions from DOM
+        const childComponent = this.data.oldChildObj()[item.id];
+        if (childComponent && childComponent.dots) {
+          const dots = childComponent.dots.toArray();
+          if (dotIndex >= 0 && dotIndex < dots.length) {
+            rect = dots[dotIndex].nativeElement.getBoundingClientRect();
+          } else {
+            throw new Error(`Invalid dot index: ${dotIndex}`);
+          }
+        } else {
+          throw new Error(`Child component not found for item: ${item.id}`);
+        }
+      }
+    } else {
+      // Always get fresh dot positions from DOM for default dots
+      const childComponent = this.data.oldChildObj()[item.id];
+      if (childComponent && childComponent.dots) {
+        const dots = childComponent.dots.toArray();
+        if (dotIndex >= 0 && dotIndex < dots.length) {
+          rect = dots[dotIndex].nativeElement.getBoundingClientRect();
+        } else {
+          throw new Error(`Invalid dot index: ${dotIndex}`);
+        }
+      } else {
+        throw new Error(`Child component not found for item: ${item.id}`);
+      }
     }
 
-    const rect = childDots[dotIndex];
     const { left, top } = this.data.flow.zRect;
     const x = (rect.x + rect.width / 2 - panX - left) / scale;
     const y = (rect.y + rect.height / 2 - panY - top) / scale;
@@ -291,15 +708,8 @@ export class Connections implements FlowPlugin {
     return { ...item, x, y, dotIndex };
   }
 
-  private setReverseDepsMap(list: FlowOptions[]) {
-    // Build reverse dependency map from children arrays
-    list.forEach((parent) => {
-      parent.children.forEach((childId) => {
-        if (!this.reverseDepsMap.has(childId)) {
-          this.reverseDepsMap.set(childId, []);
-        }
-        this.reverseDepsMap.get(childId)!.push(parent.id);
-      });
-    });
+
+  private setReverseDepsMap(_list: FlowNode[]) {
+    // This method is no longer needed as we use edges
   }
 }

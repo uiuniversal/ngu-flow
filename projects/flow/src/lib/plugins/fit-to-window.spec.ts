@@ -84,14 +84,20 @@ describe('FitToWindow', () => {
     fitToWindow.onInit({
       list,
       zoomContainer: {
-        nativeElement: { getBoundingClientRect: () => containerRect },
+        nativeElement: {
+          getBoundingClientRect: () => containerRect,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        } as any,
       },
       flow: {
         scale,
         panX,
         panY,
         zRect: containerRect,
-      },
+        config: { arrows: true, arrowSize: 20 },
+        update: () => {},
+      } as any,
       updateZoomContainer: () => {},
     } as any);
     fitToWindow.run(list, containerRect, scale, panX, panY);

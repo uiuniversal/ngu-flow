@@ -1,40 +1,52 @@
 import { ChildInfo } from '../flow-interface';
 import { FlowComponent } from '../flow.component';
-import { FlowPlugin } from './plugin';
+import { BasePlugin } from '../adapters/base/base-plugin';
+import { GeometryUtils } from '../core/utils/geometry-utils';
+import {
+  FitToWindowConfig,
+  PluginConfigManager,
+} from '../core/config/plugin-config';
 
-export class FitToWindow implements FlowPlugin {
-  private cRect!: CPosition;
+export class FitToWindow extends BasePlugin {
   private containerPadding = 0;
-  private data!: FlowComponent;
+  private configManager: PluginConfigManager<FitToWindowConfig>;
+  private originalContainerSize!: { width: number; height: number };
 
-  private list!: ChildInfo[];
-  private containerRect!: DOMRect;
-  private scale!: number;
-  private panX!: number;
-  private panY!: number;
-
-  constructor(private init = false) {}
-
-  onInit(data: FlowComponent): void {
-    this.data = data;
+  constructor(init = false, config?: Partial<FitToWindowConfig>) {
+    super();
+    this.configManager = new PluginConfigManager<FitToWindowConfig>(
+      {
+        enabled: true,
+        priority: 0,
+        containerPadding: 30,
+        maxScale: 1,
+        minScale: 0.1,
+      },
+      { ...config, enabled: init },
+    );
   }
 
-  afterInit(data: FlowComponent): void {
-    this.data = data;
-    if (this.init) {
+  override onInit(data: FlowComponent): void {
+    this.setData(data);
+  }
+
+  override afterInit(data: FlowComponent): void {
+    this.setData(data);
+    if (this.configManager.isEnabled()) {
       this.fitToWindow();
     }
   }
 
   fitToWindow() {
-    if (!this.data.list?.length) return;
+    if (!this.list?.length) return;
 
+    const transform = this.getTransform();
     this.run(
-      this.data.list,
-      this.data.zoomContainer.nativeElement.getBoundingClientRect(),
-      this.data.flow.scale,
-      this.data.flow.panX,
-      this.data.flow.panY,
+      this.list,
+      this.getContainerRect(),
+      transform.scale,
+      transform.panX,
+      transform.panY,
     );
   }
 
@@ -42,41 +54,72 @@ export class FitToWindow implements FlowPlugin {
     list: ChildInfo[],
     cRect: DOMRect,
     scale: number,
-    panX: number,
-    panY: number,
+    _panX: number,
+    _panY: number,
   ) {
     this.list = list;
-    this.containerRect = cRect;
-    this.scale = scale;
-    this.panX = panX;
-    this.panY = panY;
+
+    // Store the original container size on first call (when scale = 1)
+    if (!this.originalContainerSize || scale === 1) {
+      this.originalContainerSize = {
+        width: cRect.width,
+        height: cRect.height,
+      };
+    }
+
     this._fitToWindowInternal();
   }
 
   private _fitToWindowInternal() {
-    this.containerPadding = 30 / this.scale;
-    this.cRect = {
-      x: this.containerRect.x / this.scale - this.panX,
-      y: this.containerRect.y / this.scale - this.panY,
-      width: this.containerRect.width / this.scale,
-      height: this.containerRect.height / this.scale,
-    };
+    const config = this.configManager.getConfig();
+
+    // Use fixed container padding, not scaled
+    this.containerPadding = config.containerPadding!;
+
     const { scale, panX, panY } = this.updateValue();
-    this.data.flow.scale = scale;
+    const clampedScale = Math.max(
+      config.minScale!,
+      Math.min(config.maxScale!, scale),
+    );
+
+    this.data.flow.scale = clampedScale;
     this.data.flow.panX = panX;
     this.data.flow.panY = panY;
-    this.data.updateZoomContainer();
+    this.updateZoomContainer();
+    this.notifyLayoutUpdated();
   }
 
   private updateValue() {
     const positions = this._getPositions();
     const { minX, maxX, minY, maxY } = this._getBoundaries(positions);
-    const adjMaxX = maxX - minX + this.containerPadding;
-    const adjMaxY = maxY - minY + this.containerPadding;
-    const newScale = Math.min(this._getNewScale(adjMaxX, adjMaxY), 1);
+
+    // Calculate content size
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+
+    // Use the original container dimensions, never the scaled ones
+    const availableWidth =
+      this.originalContainerSize.width - this.containerPadding * 2;
+    const availableHeight =
+      this.originalContainerSize.height - this.containerPadding * 2;
+
+    const newScale = Math.min(
+      availableWidth / contentWidth,
+      availableHeight / contentHeight,
+      1, // Don't scale up beyond 100%
+    );
+
+    console.log('FitToWindow calculations:', {
+      currentScale: this.data.flow.scale,
+      contentSize: { width: contentWidth, height: contentHeight },
+      availableSize: { width: availableWidth, height: availableHeight },
+      newScale,
+      bounds: { minX, maxX, minY, maxY },
+    });
+
     const { panX, panY } = this._getPanValues(
-      adjMaxX,
-      adjMaxY,
+      contentWidth,
+      contentHeight,
       newScale,
       minX,
       minY,
@@ -85,67 +128,56 @@ export class FitToWindow implements FlowPlugin {
   }
 
   _getPositions() {
+    // Get the current scale to unscale the DOM dimensions
+    const currentScale = this.data.flow.scale || 1;
+
     return this.list.map((child) => {
-      const scaledX = child.elRect.x / this.scale - this.panX;
-      const scaledY = child.elRect.y / this.scale - this.panY;
-      const scaledWidth = child.elRect.width;
-      const scaledHeight = child.elRect.height;
       return {
-        x: scaledX,
-        y: scaledY,
-        width: scaledWidth,
-        height: scaledHeight,
+        x: child.position.x,
+        y: child.position.y,
+        // Unscale the DOM dimensions to get the original logical dimensions
+        width: child.elRect.width / currentScale,
+        height: child.elRect.height / currentScale,
       };
     });
   }
 
-  _getBoundaries(positions: CPosition[]) {
-    const minX = Math.min(...positions.map((p) => p.x));
-    const maxX = Math.max(...positions.map((p) => p.x + p.width));
-    const minY = Math.min(...positions.map((p) => p.y));
-    const maxY = Math.max(...positions.map((p) => p.y + p.height));
-    return { minX, maxX, minY, maxY };
+  _getBoundaries(
+    positions: Array<{ x: number; y: number; width: number; height: number }>,
+  ) {
+    return GeometryUtils.getBoundaries(positions);
   }
 
-  _getNewScale(adjMaxX: number, adjMaxY: number) {
-    const scaleX = this.cRect.width / adjMaxX;
-    const scaleY = this.cRect.height / adjMaxY;
+  _getNewScale(contentWidth: number, contentHeight: number) {
+    const availableWidth =
+      this.originalContainerSize.width - this.containerPadding * 2;
+    const availableHeight =
+      this.originalContainerSize.height - this.containerPadding * 2;
+
+    const scaleX = availableWidth / contentWidth;
+    const scaleY = availableHeight / contentHeight;
     return Math.min(scaleX, scaleY);
   }
 
   _getPanValues(
-    adjMaxX: number,
-    adjMaxY: number,
+    contentWidth: number,
+    contentHeight: number,
     newScale: number,
     minX: number,
     minY: number,
   ) {
-    // Calculate the center point of the scaled content
-    const scaledContentWidth = adjMaxX * newScale;
-    const scaledContentHeight = adjMaxY * newScale;
+    // Calculate the center point of the content bounds
+    const contentCenterX = minX + contentWidth / 2;
+    const contentCenterY = minY + contentHeight / 2;
 
-    // Calculate the center point of the container
-    const containerCenterX = this.cRect.width / 2;
-    const containerCenterY = this.cRect.height / 2;
+    // Use the original container dimensions for centering
+    const containerCenterX = this.originalContainerSize.width / 2;
+    const containerCenterY = this.originalContainerSize.height / 2;
 
-    // Calculate the difference between the container center and the content center
-    const offsetX =
-      containerCenterX - (scaledContentWidth / 2 + minX * newScale);
-    const offsetY =
-      containerCenterY - (scaledContentHeight / 2 + minY * newScale);
-
-    // Adjust pan values to center the content
-    const nPad = (this.containerPadding * newScale) / 2;
-    const panX = this.cRect.x * newScale + offsetX + nPad;
-    const panY = this.cRect.y * newScale + offsetY + nPad;
+    // Calculate pan values to center the content in the container
+    const panX = containerCenterX - contentCenterX * newScale;
+    const panY = containerCenterY - contentCenterY * newScale;
 
     return { panX, panY };
   }
-}
-
-interface CPosition {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }

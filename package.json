@@ -19,6 +19,7 @@
     "@angular/platform-browser": "^18.1.1",
     "@angular/platform-browser-dynamic": "^18.1.1",
     "@angular/router": "^18.1.1",
+    "@dagrejs/dagre": "^1.1.5",
     "@ng-icons/core": "^29.5.1",
     "@ng-icons/lucide": "^29.5.1",
     "rxjs": "~7.8.0",

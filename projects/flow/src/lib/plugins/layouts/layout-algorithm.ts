@@ -3,6 +3,7 @@ export interface LayoutNode {
   width: number;
   height: number;
   children: string[];
+  originalIndex?: number; // Added to preserve input order
 }
 
 export interface LayoutOptions {

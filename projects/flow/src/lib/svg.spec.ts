@@ -3,8 +3,8 @@ import { bezierPath } from './svg';
 describe('SvgHandler', () => {
   it('should calc the path', () => {
     const val = bezierPath(
-      { x: 0, y: 0, id: '1', deps: [], dotIndex: 0 },
-      { x: 10, y: 10, id: '2', deps: [], dotIndex: 0 },
+      { x: 0, y: 0, id: '1', children: [], dotIndex: 0 },
+      { x: 10, y: 10, id: '2', children: [], dotIndex: 0 },
       10,
       2
     );

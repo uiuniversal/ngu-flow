@@ -1,4 +1,3 @@
-import { NgForOf } from '@angular/common';
 import {
   Component,
   AfterContentInit,
@@ -12,72 +11,68 @@ import {
   ChangeDetectionStrategy,
   Input,
   OnInit,
+  inject,
 } from '@angular/core';
 import { startWith } from 'rxjs';
 import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
-import {
-  FlowOptions,
-  ChildInfo,
-  FlowDirection,
-  ArrowPathFn,
-} from './flow-interface';
+import { FlowNode, FlowEdge, FlowDirection } from './flow-interface';
 import { FlowConfig, FlowPlugin } from './plugins/plugin';
 import { Connections } from './plugins/connections';
+import { MinimapComponent } from './minimap/minimap.component';
 
-const BASE_SCALE_AMOUNT = 0.05;
-
+/**
+ * FlowComponent - Clean Architecture Implementation
+ *
+ * Usage Options:
+ * 1. Content Projection (Recommended for custom designs):
+ *    <ngu-flow>
+ *      <div flowChild="node1">Custom Node Content</div>
+ *      <div flowChild="node2">Custom Node Content</div>
+ *    </ngu-flow>
+ *
+ * 2. Nodes Input (Simple use case):
+ *    <ngu-flow [nodes]="nodeArray"></ngu-flow>
+ *
+ * Content projection takes priority for maximum developer flexibility.
+ */
 @Component({
   standalone: true,
-  imports: [NgForOf, FlowChildComponent],
+  imports: [MinimapComponent],
   providers: [FlowService],
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ngu-flow',
-  template: ` <div class="zoom-container" #zoomContainer>
-    <svg #svg>
-      <defs>
-        @if (config.arrows) {
-          <marker
-            id="arrowhead"
-            [attr.markerWidth]="arrowW"
-            [attr.markerHeight]="arrowH"
-            refX="0"
-            [attr.refY]="refY"
-            orient="auto"
-          >
-            <polygon [attr.points]="points"></polygon>
-          </marker>
-        }
-      </defs>
-      <g #g></g>
-      <!-- <g #guideLines></g> -->
-
-      <!-- <text font-size="20" text-anchor="middle">
-        <textPath xlink:href="#arrow2-to-1" startOffset="50%">
-          Follow me
-        </textPath>
-      </text> -->
-      <!-- <text font-size="20" dy="20" dx="10">
-        <textPath
-          xlink:href="#arrow2-to-1"
-          startOffset="50%"
-          side="left"
-          text-anchor="middle"
-        >
-          Follow me
-        </textPath>
-        <textPath
-          xlink:href="#arrow6-to-1"
-          startOffset="50%"
-          side="left"
-          text-anchor="middle"
-        >
-          Follow me
-        </textPath>
-      </text> -->
-    </svg>
-    <ng-content></ng-content>
-  </div>`,
+  template: `
+    <div class="zoom-container" #zoomContainer>
+      <svg #svg>
+        <defs>
+          @if (config.arrows) {
+            <marker
+              id="arrowhead"
+              [attr.markerWidth]="arrowW"
+              [attr.markerHeight]="arrowH"
+              refX="0"
+              [attr.refY]="refY"
+              orient="auto"
+            >
+              <polygon [attr.points]="points"></polygon>
+            </marker>
+          }
+        </defs>
+        <g #g></g>
+        <!-- <g #guideLines></g> -->
+        <path
+          id="temp-connection"
+          d=""
+          fill="none"
+          stroke="var(--flow-path-color)"
+          stroke-width="2"
+        ></path>
+      </svg>
+      <ng-content></ng-content>
+    </div>
+    <flow-minimap></flow-minimap>
+  `,
   styles: [
     `
       :host {
@@ -86,18 +81,10 @@ const BASE_SCALE_AMOUNT = 0.05;
         --flow-path-color: blue;
         --grid-size: 20px;
         display: block;
-        height: 100%;
-        width: 100%;
         position: relative;
-        overflow: hidden;
-      }
-
-      .flow-pattern {
-        position: absolute;
         width: 100%;
         height: 100%;
-        top: 0px;
-        left: 0px;
+        overflow: hidden;
       }
 
       .zoom-container {
@@ -128,58 +115,82 @@ const BASE_SCALE_AMOUNT = 0.05;
 export class FlowComponent
   implements OnInit, AfterContentInit, AfterViewInit, OnDestroy
 {
+  public el = inject(ElementRef<HTMLElement>);
+  public flow = inject(FlowService);
+  private ngZone = inject(NgZone);
+
   @Input() config: FlowConfig = new FlowConfig();
+  @Input() nodes: FlowNode[] = []; // Optional - only used when no content children
+  @Input() edges: FlowEdge[] = [];
   @ContentChildren(FlowChildComponent) children =
     new QueryList<FlowChildComponent>();
 
-  // @ViewChildren('arrowPaths') arrowPaths: QueryList<ElementRef<SVGPathElement>>;
   @ViewChild('zoomContainer') zoomContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('svg') svg!: ElementRef<SVGSVGElement>;
   @ViewChild('g') g!: ElementRef<SVGGElement>;
-  // New SVG element for guide lines
-  @ViewChild('guideLines') guideLines!: ElementRef<SVGGElement>;
+
+  // UI state for drag handling
   initialX = 0;
   initialY = 0;
   defaultPlugins = [new Connections()];
 
+  // Arrow configuration
   arrowW = 10;
   arrowH = 10;
   refY = 3.5;
   points = '0 0, 10 3.5, 0 7';
 
-  constructor(
-    public el: ElementRef<HTMLElement>,
-    public flow: FlowService,
-    private ngZone: NgZone,
-  ) {}
+  constructor() {}
 
   ngOnInit(): void {
-    this.flow.zoomContainer = this.el.nativeElement;
-    this.config = { ...new FlowConfig(), ...this.config };
-    this.flow.config = this.config;
-    this.calculateArrowSize();
-    this.flow.arrowsChange.subscribe((e) => {
-      this.runPlugin((p) => p.onNodeChange?.(this, e));
-    });
-    this.ngZone.runOutsideAngular(() => {
-      this.el.nativeElement.addEventListener('wheel', this._wheelPanning);
+    this.initializeConfig();
+    this.initializeFlowService();
+    this.setupEventListeners();
+    this.setupPlugins();
+  }
 
+  private initializeConfig(): void {
+    this.config = { ...new FlowConfig(), ...this.config };
+    this.flow.updateConfig(this.config);
+    this.calculateArrowSize();
+  }
+
+  private initializeFlowService(): void {
+    this.flow.setZoomContainer(this.el.nativeElement);
+    this.flow.arrowsChange.subscribe((node) => {
+      this.runPlugin((p) => p.onNodeChange?.(this, node));
+    });
+
+    // Subscribe to zoom and pan changes to update DOM
+    this.flow.scaleChange.subscribe(() => {
+      this.updateZoomContainer();
+    });
+
+    this.flow.panChange.subscribe(() => {
+      this.updateZoomContainer();
+    });
+  }
+
+  private setupEventListeners(): void {
+    this.ngZone.runOutsideAngular(() => {
+      this.el.nativeElement.addEventListener('wheel', this._wheelHandler);
       this.el.nativeElement.addEventListener(
         'mousedown',
-        this._startDraggingZoomContainer,
+        this._mouseDownHandler,
       );
-      this.el.nativeElement.addEventListener(
-        'mouseup',
-        this._stopDraggingZoomContainer,
-      );
+      this.el.nativeElement.addEventListener('mouseup', this._mouseUpHandler);
       this.el.nativeElement.addEventListener(
         'mousemove',
-        this._dragZoomContainer,
+        this._mouseMoveHandler,
       );
     });
   }
 
-  calculateArrowSize() {
+  private setupPlugins(): void {
+    this.runPlugin((p) => p.onInit?.(this));
+  }
+
+  calculateArrowSize(): void {
     const size = this.config.arrowSize!;
     const scaleFactor = size / 20;
     this.arrowW = 10 * scaleFactor;
@@ -189,182 +200,208 @@ export class FlowComponent
   }
 
   ngAfterViewInit(): void {
-    this.runPlugin((e) => e.afterInit?.(this));
     this.children.changes.pipe(startWith(this.children)).subscribe(() => {
-      this.flow.update(this.children.map((x) => x.position));
+      // Prioritize content children over nodes input for flexibility
+      const positions =
+        this.children.length > 0
+          ? this.children.map((x) => x.position)
+          : this.nodes;
+
+      this.flow.updateNodes(positions);
+      this.flow.updateEdges(this.edges);
+
       this.runPlugin((e) => e.beforeUpdate?.(this));
       this.runPlugin((e) => e.onChange?.(this));
       requestAnimationFrame(() => this.runPlugin((p) => p.afterUpdate?.(this)));
     });
+    this.runPlugin((e) => e.afterInit?.(this));
   }
 
-  private runPlugin(callback: (e: FlowPlugin) => void) {
-    for (const plug of this.defaultPlugins) {
-      callback(plug);
-    }
-    for (const key in this.config.plugins) {
-      if (Object.prototype.hasOwnProperty.call(this.config.plugins, key)) {
-        const element = this.config.plugins[key];
-        callback(element);
-      }
-    }
+  ngAfterContentInit(): void {}
+
+  ngOnDestroy(): void {
+    this.el.nativeElement.removeEventListener('wheel', this._wheelHandler);
+    this.el.nativeElement.removeEventListener(
+      'mousedown',
+      this._mouseDownHandler,
+    );
+    this.el.nativeElement.removeEventListener('mouseup', this._mouseUpHandler);
+    this.el.nativeElement.removeEventListener(
+      'mousemove',
+      this._mouseMoveHandler,
+    );
   }
 
-  ngAfterContentInit() {}
+  // Event handlers - delegate to FlowService
+  private _wheelHandler = (event: WheelEvent) => {
+    if (event.deltaX === 0) {
+      this.flow.handleWheel(event, event.clientX, event.clientY);
+    }
+  };
 
-  updateChildDragging(enable = true) {
+  private _mouseDownHandler = (event: MouseEvent) => {
+    event.stopPropagation();
+    this.initialX = event.clientX - this.flow.getPanX();
+    this.initialY = event.clientY - this.flow.getPanY();
+    this.flow.handlePanStart(this.initialX, this.initialY);
+  };
+
+  private _mouseUpHandler = (event: MouseEvent) => {
+    event.stopPropagation();
+    this.flow.handlePanEnd();
+    this.runPlugin((p) => p.onMouseUp?.(this, event));
+  };
+
+  private _mouseMoveHandler = (event: MouseEvent) => {
+    this.flow.handlePan(
+      event.clientX,
+      event.clientY,
+      this.initialX,
+      this.initialY,
+    );
+    this.runPlugin((p) => p.onMouseMove?.(this, event));
+  };
+
+  // Public API methods
+  zoomIn(): void {
+    const rect = this.flow.getZoomContainerRect();
+    this.flow.handleWheel(
+      new WheelEvent('wheel', {
+        deltaY: -100,
+        clientX: rect.width / 2,
+        clientY: rect.height / 2,
+      }),
+      rect.width / 2,
+      rect.height / 2,
+    );
+  }
+
+  zoomOut(): void {
+    const rect = this.flow.getZoomContainerRect();
+    this.flow.handleWheel(
+      new WheelEvent('wheel', {
+        deltaY: 100,
+        clientX: rect.width / 2,
+        clientY: rect.height / 2,
+      }),
+      rect.width / 2,
+      rect.height / 2,
+    );
+  }
+
+  updateChildDragging(enable = true): void {
+    this.flow.updateConfig({ childDragging: enable });
     this.flow.enableChildDragging.next(enable);
   }
 
-  updateZooming(enable = true) {
+  updateZooming(enable = true): void {
+    this.flow.updateConfig({ zooming: enable });
     this.flow.enableZooming.next(enable);
   }
 
-  updateDirection(direction: FlowDirection) {
-    this.flow.config.direction = direction;
+  updateDirection(direction: FlowDirection): void {
+    this.flow.updateConfig({ direction });
     this.runPlugin((e) => e.beforeUpdate?.(this));
     this.runPlugin((e) => e.onChange?.(this));
     requestAnimationFrame(() => this.runPlugin((p) => p.afterUpdate?.(this)));
   }
 
-  updateArrowFn(fn: ArrowPathFn) {
-    this.flow.arrowFn = fn;
-    this.runPlugin((e) => e.onChange?.(this));
-    requestAnimationFrame(() => this.runPlugin((p) => p.afterUpdate?.(this)));
+  updateZoomContainer(): void {
+    const scale = this.flow.getScale();
+    const panX = this.flow.getPanX();
+    const panY = this.flow.getPanY();
+    this.zoomContainer.nativeElement.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${scale})`;
   }
 
-  public _startDraggingZoomContainer = (event: MouseEvent) => {
-    event.stopPropagation();
-    this.flow.isDraggingZoomContainer = true;
-    this.initialX = event.clientX - this.flow.panX;
-    this.initialY = event.clientY - this.flow.panY;
-  };
-
-  public _stopDraggingZoomContainer = (event: MouseEvent) => {
-    event.stopPropagation();
-    this.flow.isDraggingZoomContainer = false;
-  };
-
-  public _dragZoomContainer = (event: MouseEvent) => {
-    if (this.flow.isDraggingZoomContainer) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.flow.panX = event.clientX - this.initialX;
-      this.flow.panY = event.clientY - this.initialY;
-      this.updateZoomContainer();
+  // Plugin system
+  public runPlugin(callback: (e: FlowPlugin) => void): void {
+    const config = this.flow.getConfig();
+    for (const key in config.plugins) {
+      if (Object.prototype.hasOwnProperty.call(config.plugins, key)) {
+        const element = config.plugins[key];
+        callback(element);
+      }
     }
-  };
-
-  public _wheelPanning = (event: WheelEvent) => {
-    event.stopPropagation();
-    event.preventDefault();
-    if (event.ctrlKey || event.metaKey) {
-      if (!this.flow.enableZooming.value) return;
-      this.zoomHandle(event);
-    } else {
-      this.flow.panX -= event.deltaX;
-      this.flow.panY -= event.deltaY;
-      this.updateZoomContainer();
+    for (const plug of this.defaultPlugins) {
+      callback(plug);
     }
-  };
-
-  // zoom in should be center on the screen
-  zoomIn() {
-    // we have to consider the center of the zrect respective to viewport
-    this.setZoom1(this.flow.zRect.width / 2, this.flow.zRect.height / 2, 1);
   }
 
-  zoomOut() {
-    this.setZoom1(this.flow.zRect.width / 2, this.flow.zRect.height / 2, -1);
-  }
-
-  private zoomHandle = (event: WheelEvent) => {
-    if (this.flow.isDraggingZoomContainer || this.flow.isChildDragging) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const scaleDirection = event.deltaY < 0 ? 1 : -1;
-    // if it is zoom out and the scale is less than 0.2, then return
-    if (scaleDirection === -1 && this.flow.scale < 0.1) return;
-
-    this.setZoom1(event.clientX, event.clientY, scaleDirection);
-  };
-
-  private setZoom1(clientX: number, clientY: number, scaleDirection: number) {
-    const { left, top } = this.flow.zRect;
-    const { scale, panX, panY } = this._setZoom(
-      clientX - left,
-      clientY - top,
-      scaleDirection,
-      this.flow.panX,
-      this.flow.panY,
-      this.flow.scale,
-    );
-    this.flow.scale = scale;
-    this.flow.panX = panX;
-    this.flow.panY = panY;
-
-    // Apply the zoom and the pan
-    this.updateZoomContainer();
-  }
-
-  public _setZoom(
-    wheelClientX: number,
-    wheelClientY: number,
-    scaleDirection: number,
-    panX: number,
-    panY: number,
-    scale: number,
-  ) {
-    // Make scaleAmount proportional to the current scale
-    const scaleAmount = BASE_SCALE_AMOUNT * scale;
-    // Calculate new scale
-    const newScale = scale + scaleDirection * scaleAmount;
-    // Calculate new pan values to keep the zoom point in the same position on the screen
-    const newPanX = wheelClientX + ((panX - wheelClientX) * newScale) / scale;
-    const newPanY = wheelClientY + ((panY - wheelClientY) * newScale) / scale;
-
-    return { scale: newScale, panX: newPanX, panY: newPanY };
-  }
-
-  updateZoomContainer() {
-    this.zoomContainer.nativeElement.style.transform = `translate3d(${this.flow.panX}px, ${this.flow.panY}px, 0) scale(${this.flow.scale})`;
-  }
-
+  // Compatibility getters and methods for plugins
   get list() {
-    return this.children.toArray().map((x) => {
-      // calculate the width and height with scale
-      const elRect = x.el.nativeElement.getBoundingClientRect();
-      const width = elRect.width / this.flow.scale;
-      const height = elRect.height / this.flow.scale;
-      const newElRect = {
-        x: elRect.x,
-        y: elRect.y,
-        bottom: elRect.bottom,
-        left: elRect.left,
-        right: elRect.right,
-        top: elRect.top,
-        width,
-        height,
-      };
-      return {
-        position: x.position,
-        elRect: newElRect,
-        dots: x.dots.map((y) => y.nativeElement.getBoundingClientRect()),
-      } as ChildInfo;
-    });
+    // When using nodes input, the order should follow the nodes array
+    // When using content projection, follow the content children order
+    if (this.nodes.length > 0 && this.children.length === 0) {
+      // Using nodes input without content children - create list from nodes array
+      return this.nodes.map((nodePosition) => ({
+        position: nodePosition,
+        dots: [],
+        el: null,
+        elRect: new DOMRect(),
+      }));
+    }
+
+    // Using content children - but respect the nodes array order if both exist
+    const childrenArray = this.children.toArray();
+
+    if (this.nodes.length > 0) {
+      // Both nodes and children exist - sort children to match nodes order
+      const sortedChildren = this.nodes
+        .map((node) =>
+          childrenArray.find((child) => child.position.id === node.id),
+        )
+        .filter(Boolean) as typeof childrenArray;
+
+      // Add any children not in nodes array at the end
+      const usedIds = new Set(this.nodes.map((n) => n.id));
+      const extraChildren = childrenArray.filter(
+        (child) => !usedIds.has(child.position.id),
+      );
+      sortedChildren.push(...extraChildren);
+
+      return sortedChildren.map(this.mapChildToListItem.bind(this));
+    }
+
+    // Only content children - use their natural order
+    return childrenArray.map(this.mapChildToListItem.bind(this));
   }
 
-  positionChange(position: FlowOptions) {
-    // Find the item in the list
-    const item = this.list.find((item) => item.position.id === position.id);
+  private mapChildToListItem(child: any) {
+    const elRect = child.el?.nativeElement?.getBoundingClientRect();
+    const width = elRect ? elRect.width / this.flow.getScale() : 0;
+    const height = elRect ? elRect.height / this.flow.getScale() : 0;
+    const scaledElRect = elRect
+      ? ({
+          x: elRect.x,
+          y: elRect.y,
+          bottom: elRect.bottom,
+          left: elRect.left,
+          right: elRect.right,
+          top: elRect.top,
+          width,
+          height,
+        } as DOMRect)
+      : new DOMRect();
 
-    // Update item position
-    if (!item) return;
-    item.position.x = position.x;
-    item.position.y = position.y;
+    return {
+      position: child.position,
+      dots:
+        child.dots
+          ?.toArray()
+          .map((dot: any) => dot.nativeElement.getBoundingClientRect()) || [],
+      el: child.el?.nativeElement,
+      elRect: scaledElRect,
+    };
+  }
 
-    // Update arrows
-    requestAnimationFrame(() => this.runPlugin((p) => p.onNodeChange?.(this, position)));
+  getChildInfo() {
+    return this.list.reduce(
+      (acc, curr) => {
+        acc[curr.position.id] = curr;
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
   }
 
   oldChildObj() {
@@ -375,19 +412,5 @@ export class FlowComponent
       },
       {} as Record<string, FlowChildComponent>,
     );
-  }
-
-  getChildInfo() {
-    return this.list.reduce(
-      (acc, curr) => {
-        acc[curr.position.id] = curr;
-        return acc;
-      },
-      {} as Record<string, ChildInfo>,
-    );
-  }
-
-  ngOnDestroy(): void {
-    this.el.nativeElement.removeEventListener('wheel', this.zoomHandle);
   }
 }

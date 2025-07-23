@@ -45,7 +45,7 @@ import {
     <label for="arrowType">
       <select id="arrowType" [formControl]="arrowType">
         @for (fn of arrowFns; track fn; let i = $index) {
-        <option [value]="i">Arrow {{ i }}</option>
+          <option [value]="i">Arrow {{ i }}</option>
         }
       </select>
     </label>
@@ -87,9 +87,9 @@ export class ToolbarComponent implements OnInit {
     this.direction.valueChanges.subscribe((val) => {
       this.demoService.flow.updateDirection(this.direction.value!);
     });
-    this.arrowType.valueChanges.subscribe((val) => {
-      this.demoService.flow.updateArrowFn(this.arrowFns[val!]);
-    });
+    // this.arrowType.valueChanges.subscribe((val) => {
+    //   this.demoService.flow.updateArrowFn(this.arrowFns[val!]);
+    // });
   }
 
   ngOnInit() {}
