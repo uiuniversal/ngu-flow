@@ -22,7 +22,6 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-demo-one-simple',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FlowComponent,

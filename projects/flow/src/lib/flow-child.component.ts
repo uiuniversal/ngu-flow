@@ -1,17 +1,17 @@
-import { CommonModule } from '@angular/common';
 import {
   Component,
   OnInit,
   OnDestroy,
-  ViewChildren,
-  QueryList,
+  viewChildren,
   ElementRef,
-  Input,
+  input,
+  output,
   NgZone,
   OnChanges,
   SimpleChanges,
   ChangeDetectionStrategy,
   inject,
+  effect,
 } from '@angular/core';
 import { Subject, Subscription } from 'rxjs';
 import { FlowService } from './flow.service';
@@ -19,8 +19,7 @@ import { FlowNode } from './flow-interface';
 import { FlowDotDirective } from './dot.directive';
 
 @Component({
-  standalone: true,
-  imports: [CommonModule, FlowDotDirective],
+  imports: [FlowDotDirective],
   selector: '[flowChild]',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<ng-content></ng-content>
@@ -28,28 +27,28 @@ import { FlowDotDirective } from './dot.directive';
       #dot
       id="top"
       class="dot dot-top"
-      [flowDot]="position"
+      [flowDot]="position()"
       [dot]="{ id: 'top', type: 'output' }"
     ></div>
     <div
       #dot
       id="right"
       class="dot dot-right"
-      [flowDot]="position"
+      [flowDot]="position()"
       [dot]="{ id: 'right', type: 'output' }"
     ></div>
     <div
       #dot
       id="bottom"
       class="dot dot-bottom"
-      [flowDot]="position"
+      [flowDot]="position()"
       [dot]="{ id: 'bottom', type: 'output' }"
     ></div>
     <div
       #dot
       id="left"
       class="dot dot-left"
-      [flowDot]="position"
+      [flowDot]="position()"
       [dot]="{ id: 'left', type: 'output' }"
     ></div>`,
   styles: [
@@ -92,9 +91,12 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
   private offsetX = 0;
   private offsetY = 0;
 
-  @ViewChildren('dot') dots!: QueryList<ElementRef<HTMLDivElement>>;
+  dots = viewChildren<ElementRef<HTMLDivElement>>('dot');
 
-  @Input('flowChild') position!: FlowNode;
+  position = input.required<FlowNode>({ alias: 'flowChild' });
+
+  // Output events
+  positionChanged = output<FlowNode>();
 
   private positionChange = new Subject<FlowNode>();
   private mouseMoveSubscription!: Subscription;
@@ -103,10 +105,11 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
   constructor() {
     this.el.nativeElement.style.position = 'absolute';
     this.el.nativeElement.style.transformOrigin = '0, 0';
-    // track mouse move outside angular
-    this.ngZone.runOutsideAngular(() => {
-      this.flowService.enableChildDragging.subscribe((x) => {
-        if (x) {
+    // track mouse move outside angular and react to dragging state changes
+    effect(() => {
+      const isDraggingEnabled = this.flowService.enableChildDragging();
+      this.ngZone.runOutsideAngular(() => {
+        if (isDraggingEnabled) {
           this.enableDragging();
         } else {
           this.disableDragging();
@@ -114,20 +117,32 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
       });
     });
 
-    this.layoutSubscribe = this.flowService.layoutUpdated.subscribe((x) => {
-      this.position = this.flowService.items.get(
-        this.position.id,
+    this.layoutSubscribe = this.flowService.layoutUpdated.subscribe((_) => {
+      const currentPosition = this.flowService.items.get(
+        this.position().id,
       ) as FlowNode;
-      this.positionChange.next(this.position);
+      if (currentPosition) {
+        this.positionChange.next(currentPosition);
+      }
     });
 
-    this.positionChange.subscribe((x) => {
-      this.updatePosition(this.position.x, this.position.y);
+    this.positionChange.subscribe((updatedPosition) => {
+      this.updatePosition(updatedPosition.x, updatedPosition.y);
+    });
+
+    // Use effect to react to position changes
+    effect(() => {
+      const pos = this.position();
+      this.updatePosition(pos.x, pos.y);
     });
   }
 
   private onMouseUp = (event: MouseEvent) => {
     event.stopPropagation();
+    if (this.isDragging) {
+      // Emit position change event when drag ends
+      this.positionChanged.emit(this.position());
+    }
     this.isDragging = false;
     this.flowService.isChildDragging = false;
   };
@@ -160,10 +175,12 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
             (this.flowService.gridSize * this.flowService.scale),
         ) * this.flowService.gridSize;
 
-      this.position.x = x;
-      this.position.y = y;
-      this.positionChange.next(this.position);
-      this.flowService.arrowsChange.next(this.position);
+      const currentPosition = this.position();
+      this.position().x = x;
+      this.position().y = y;
+      const updatedPosition: FlowNode = { ...currentPosition, x, y };
+      this.positionChange.next(updatedPosition);
+      this.flowService.arrowsChange.next(updatedPosition);
     }
   };
 
@@ -182,14 +199,12 @@ export class FlowChildComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnInit() {
-    this.updatePosition(this.position.x, this.position.y);
+    const pos = this.position();
+    this.updatePosition(pos.x, pos.y);
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
-    // console.log(`ngOnChanges ${this.position.id}`, changes);
-    // if (changes['position']) {
-    //   this.updatePosition(this.position.x, this.position.y);
-    // }
+  ngOnChanges(_changes: SimpleChanges): void {
+    // No longer needed since we use effects for position changes
   }
 
   private updatePosition(x: number, y: number) {

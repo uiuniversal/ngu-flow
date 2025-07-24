@@ -3,17 +3,18 @@ import {
   AfterContentInit,
   AfterViewInit,
   OnDestroy,
-  ContentChildren,
-  QueryList,
-  ViewChild,
+  contentChildren,
+  viewChild,
   ElementRef,
   NgZone,
   ChangeDetectionStrategy,
-  Input,
+  input,
+  output,
   OnInit,
   inject,
+  afterRenderEffect,
+  untracked,
 } from '@angular/core';
-import { startWith } from 'rxjs';
 import { FlowChildComponent } from './flow-child.component';
 import { FlowService } from './flow.service';
 import { FlowNode, FlowEdge, FlowDirection } from './flow-interface';
@@ -37,7 +38,6 @@ import { MinimapComponent } from './minimap/minimap.component';
  * Content projection takes priority for maximum developer flexibility.
  */
 @Component({
-  standalone: true,
   imports: [MinimapComponent],
   providers: [FlowService],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -46,7 +46,7 @@ import { MinimapComponent } from './minimap/minimap.component';
     <div class="zoom-container" #zoomContainer>
       <svg #svg>
         <defs>
-          @if (config.arrows) {
+          @if (config().arrows) {
             <marker
               id="arrowhead"
               [attr.markerWidth]="arrowW"
@@ -119,15 +119,18 @@ export class FlowComponent
   public flow = inject(FlowService);
   private ngZone = inject(NgZone);
 
-  @Input() config: FlowConfig = new FlowConfig();
-  @Input() nodes: FlowNode[] = []; // Optional - only used when no content children
-  @Input() edges: FlowEdge[] = [];
-  @ContentChildren(FlowChildComponent) children =
-    new QueryList<FlowChildComponent>();
+  config = input(new FlowConfig());
+  nodes = input<FlowNode[]>([]); // Optional - only used when no content children
+  edges = input<FlowEdge[]>([]);
+  children = contentChildren(FlowChildComponent);
 
-  @ViewChild('zoomContainer') zoomContainer!: ElementRef<HTMLDivElement>;
-  @ViewChild('svg') svg!: ElementRef<SVGSVGElement>;
-  @ViewChild('g') g!: ElementRef<SVGGElement>;
+  // Output events
+  connectionCreated = output<FlowEdge>();
+
+  zoomContainer =
+    viewChild.required<ElementRef<HTMLDivElement>>('zoomContainer');
+  svg = viewChild.required<ElementRef<SVGSVGElement>>('svg');
+  g = viewChild.required<ElementRef<SVGGElement>>('g');
 
   // UI state for drag handling
   initialX = 0;
@@ -140,7 +143,29 @@ export class FlowComponent
   refY = 3.5;
   points = '0 0, 10 3.5, 0 7';
 
-  constructor() {}
+  constructor() {
+    // Use afterRenderEffect for DOM-related operations in Angular v19+
+    afterRenderEffect(() => {
+      // Prioritize content children over nodes input for flexibility
+      const childrenArray = this.children();
+      const edges = this.edges();
+      untracked(() => {
+        const positions =
+          childrenArray.length > 0
+            ? childrenArray.map((x) => x.position())
+            : this.nodes();
+
+        this.flow.updateNodes(positions);
+        this.flow.updateEdges(edges);
+
+        this.runPlugin((e) => e.beforeUpdate?.(this));
+        this.runPlugin((e) => e.onChange?.(this));
+        requestAnimationFrame(() =>
+          this.runPlugin((p) => p.afterUpdate?.(this)),
+        );
+      });
+    });
+  }
 
   ngOnInit(): void {
     this.initializeConfig();
@@ -150,8 +175,8 @@ export class FlowComponent
   }
 
   private initializeConfig(): void {
-    this.config = { ...new FlowConfig(), ...this.config };
-    this.flow.updateConfig(this.config);
+    const mergedConfig = { ...new FlowConfig(), ...this.config() };
+    this.flow.updateConfig(mergedConfig);
     this.calculateArrowSize();
   }
 
@@ -191,7 +216,7 @@ export class FlowComponent
   }
 
   calculateArrowSize(): void {
-    const size = this.config.arrowSize!;
+    const size = this.config().arrowSize!;
     const scaleFactor = size / 20;
     this.arrowW = 10 * scaleFactor;
     this.arrowH = 7 * scaleFactor;
@@ -200,20 +225,6 @@ export class FlowComponent
   }
 
   ngAfterViewInit(): void {
-    this.children.changes.pipe(startWith(this.children)).subscribe(() => {
-      // Prioritize content children over nodes input for flexibility
-      const positions =
-        this.children.length > 0
-          ? this.children.map((x) => x.position)
-          : this.nodes;
-
-      this.flow.updateNodes(positions);
-      this.flow.updateEdges(this.edges);
-
-      this.runPlugin((e) => e.beforeUpdate?.(this));
-      this.runPlugin((e) => e.onChange?.(this));
-      requestAnimationFrame(() => this.runPlugin((p) => p.afterUpdate?.(this)));
-    });
     this.runPlugin((e) => e.afterInit?.(this));
   }
 
@@ -291,12 +302,12 @@ export class FlowComponent
 
   updateChildDragging(enable = true): void {
     this.flow.updateConfig({ childDragging: enable });
-    this.flow.enableChildDragging.next(enable);
+    this.flow.enableChildDragging.set(enable);
   }
 
   updateZooming(enable = true): void {
     this.flow.updateConfig({ zooming: enable });
-    this.flow.enableZooming.next(enable);
+    this.flow.enableZooming.set(enable);
   }
 
   updateDirection(direction: FlowDirection): void {
@@ -310,7 +321,7 @@ export class FlowComponent
     const scale = this.flow.getScale();
     const panX = this.flow.getPanX();
     const panY = this.flow.getPanY();
-    this.zoomContainer.nativeElement.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${scale})`;
+    this.zoomContainer().nativeElement.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${scale})`;
   }
 
   // Plugin system
@@ -331,9 +342,12 @@ export class FlowComponent
   get list() {
     // When using nodes input, the order should follow the nodes array
     // When using content projection, follow the content children order
-    if (this.nodes.length > 0 && this.children.length === 0) {
+    const nodesArray = this.nodes();
+    const childrenArray = this.children();
+
+    if (nodesArray.length > 0 && childrenArray.length === 0) {
       // Using nodes input without content children - create list from nodes array
-      return this.nodes.map((nodePosition) => ({
+      return nodesArray.map((nodePosition) => ({
         position: nodePosition,
         dots: [],
         el: null,
@@ -341,25 +355,22 @@ export class FlowComponent
       }));
     }
 
-    // Using content children - but respect the nodes array order if both exist
-    const childrenArray = this.children.toArray();
-
-    if (this.nodes.length > 0) {
+    if (nodesArray.length > 0) {
       // Both nodes and children exist - sort children to match nodes order
-      const sortedChildren = this.nodes
+      const sortedChildren = nodesArray
         .map((node) =>
-          childrenArray.find((child) => child.position.id === node.id),
+          childrenArray.find((child) => child.position().id === node.id),
         )
         .filter(Boolean) as typeof childrenArray;
 
       // Add any children not in nodes array at the end
-      const usedIds = new Set(this.nodes.map((n) => n.id));
+      const usedIds = new Set(nodesArray.map((n) => n.id));
       const extraChildren = childrenArray.filter(
-        (child) => !usedIds.has(child.position.id),
+        (child) => !usedIds.has(child.position().id),
       );
-      sortedChildren.push(...extraChildren);
+      const allChildren = [...sortedChildren, ...extraChildren];
 
-      return sortedChildren.map(this.mapChildToListItem.bind(this));
+      return allChildren.map(this.mapChildToListItem.bind(this));
     }
 
     // Only content children - use their natural order
@@ -384,11 +395,11 @@ export class FlowComponent
       : new DOMRect();
 
     return {
-      position: child.position,
+      position: child.position(),
       dots:
-        child.dots
-          ?.toArray()
-          .map((dot: any) => dot.nativeElement.getBoundingClientRect()) || [],
+        child
+          .dots()
+          ?.map((dot: any) => dot.nativeElement.getBoundingClientRect()) || [],
       el: child.el?.nativeElement,
       elRect: scaledElRect,
     };
@@ -405,12 +416,17 @@ export class FlowComponent
   }
 
   oldChildObj() {
-    return this.children.toArray().reduce(
-      (acc, curr) => {
-        acc[curr.position.id] = curr;
+    return this.children().reduce(
+      (acc: Record<string, FlowChildComponent>, curr: FlowChildComponent) => {
+        acc[curr.position().id] = curr;
         return acc;
       },
       {} as Record<string, FlowChildComponent>,
     );
+  }
+
+  // Method for plugins to emit connection events
+  emitConnectionCreated(edge: FlowEdge): void {
+    this.connectionCreated.emit(edge);
   }
 }

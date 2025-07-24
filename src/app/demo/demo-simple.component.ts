@@ -8,11 +8,8 @@ import {
 import {
   FlowComponent,
   FlowChildComponent,
-  FlowNode,
-  FlowEdge,
   FlowConfig,
   FitToWindow,
-  ScrollIntoView,
   Arrangements,
 } from '@ngu/flow';
 import { DemoService } from './demo.service';
@@ -20,7 +17,6 @@ import { SnapGrid } from 'projects/flow/src/lib/plugins/snap-grid';
 
 @Component({
   selector: 'app-demo-simple',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FlowComponent, FlowChildComponent],
   template: `

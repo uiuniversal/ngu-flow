@@ -1,4 +1,4 @@
-import { ArrowPathFn } from '@ngu/flow';
+import { ArrowPathFn } from '../../flow-interface';
 
 // get the svg path similar to flow chart path
 //   --

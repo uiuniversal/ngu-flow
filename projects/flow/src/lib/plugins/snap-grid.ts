@@ -132,7 +132,7 @@ export class SnapGrid implements FlowPlugin {
     this.gridElement.appendChild(svg);
 
     // Insert as first child of zoom container
-    const zoomContainer = this.data.zoomContainer.nativeElement;
+    const zoomContainer = this.data.zoomContainer().nativeElement;
     zoomContainer.insertBefore(this.gridElement, zoomContainer.firstChild);
   }
 

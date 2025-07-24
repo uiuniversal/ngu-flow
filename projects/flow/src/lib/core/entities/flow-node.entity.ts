@@ -2,12 +2,12 @@
  * Core entity representing a node in the flow diagram.
  * This is a pure data structure with no framework dependencies.
  */
-export interface FlowNode {
+export interface FlowNode<T = any> {
   x: number;
   y: number;
   id: string;
   dots?: Dot[];
-  data?: any;
+  data?: T;
 }
 
 /**

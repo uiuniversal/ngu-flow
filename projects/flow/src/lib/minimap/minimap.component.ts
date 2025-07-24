@@ -1,19 +1,17 @@
 import {
   Component,
   ElementRef,
-  ViewChild,
+  viewChild,
   AfterViewInit,
   OnDestroy,
   NgZone,
   inject,
+  afterRenderEffect,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FlowComponent } from '../flow.component';
 import { Subscription } from 'rxjs';
 
 @Component({
-  standalone: true,
-  imports: [CommonModule],
   selector: 'flow-minimap',
   template: `
     <div class="minimap-container">
@@ -63,9 +61,9 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
   private ngZone = inject(NgZone);
   readonly flowComponent = inject(FlowComponent);
 
-  @ViewChild('minimapSvg') minimapSvg!: ElementRef<SVGSVGElement>;
-  @ViewChild('minimapG') minimapG!: ElementRef<SVGGElement>;
-  @ViewChild('viewportRect') viewportRect!: ElementRef<SVGRectElement>;
+  minimapSvg = viewChild.required<ElementRef<SVGSVGElement>>('minimapSvg');
+  minimapG = viewChild.required<ElementRef<SVGGElement>>('minimapG');
+  viewportRect = viewChild.required<ElementRef<SVGRectElement>>('viewportRect');
 
   private subscriptions: Subscription[] = [];
   private minimapScale = 0.1; // Initial scale for the minimap
@@ -75,30 +73,24 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
   private lastUpdateTime = 0;
   private updateThrottle = 100; // Minimum ms between updates
 
+  constructor() {
+    // Use afterRenderEffect for DOM-related operations in Angular v19+
+    afterRenderEffect(() => {
+      // Track changes to children
+      this.flowComponent.children();
+      this.log('Children changed, drawing minimap');
+      this.drawMinimap();
+    });
+  }
+
   ngAfterViewInit(): void {
-    // Check if flowComponent is available
-    if (!this.flowComponent) {
-      console.warn('FlowComponent not provided to minimap');
-      return;
-    }
-
-    // Subscribe to children changes if available
-    if (this.flowComponent.children) {
-      this.subscriptions.push(
-        this.flowComponent.children.changes.subscribe(() => {
-          console.log('Children changed, drawing minimap');
-          this.drawMinimap();
-        }),
-      );
-    }
-
     // Subscribe to flow service events if they exist
     if (this.flowComponent.flow) {
       // Layout updates
       if (this.flowComponent.flow.layoutUpdated) {
         this.subscriptions.push(
           this.flowComponent.flow.layoutUpdated.subscribe(() => {
-            console.log('Layout updated, drawing minimap');
+            this.log('Layout updated, drawing minimap');
             this.drawMinimap();
           }),
         );
@@ -108,7 +100,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
       if (this.flowComponent.flow.scaleChange) {
         this.subscriptions.push(
           this.flowComponent.flow.scaleChange.subscribe(() => {
-            console.log('Scale changed, updating minimap');
+            this.log('Scale changed, updating minimap');
             this.updateViewportRect();
           }),
         );
@@ -118,7 +110,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
       if (this.flowComponent.flow.panChange) {
         this.subscriptions.push(
           this.flowComponent.flow.panChange.subscribe(() => {
-            console.log('Pan changed, updating viewport');
+            this.log('Pan changed, updating viewport');
             this.updateViewportRect();
           }),
         );
@@ -128,7 +120,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
       if (this.flowComponent.flow.arrowsChange) {
         this.subscriptions.push(
           this.flowComponent.flow.arrowsChange.subscribe(() => {
-            console.log('Arrows changed, drawing minimap');
+            this.log('Arrows changed, drawing minimap');
             this.drawMinimap();
           }),
         );
@@ -138,7 +130,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
       if (this.flowComponent.flow.nodePositionChange) {
         this.subscriptions.push(
           this.flowComponent.flow.nodePositionChange.subscribe(() => {
-            console.log('Node position changed, drawing minimap');
+            this.log('Node position changed, drawing minimap');
             this.drawMinimap();
           }),
         );
@@ -155,7 +147,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
           }
         });
         if (shouldUpdate) {
-          console.log('DOM mutation detected, drawing minimap');
+          this.log('DOM mutation detected, drawing minimap');
           this.drawMinimap();
         }
       });
@@ -174,7 +166,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
     }
 
     this.ngZone.runOutsideAngular(() => {
-      this.viewportRect.nativeElement.addEventListener(
+      this.viewportRect().nativeElement.addEventListener(
         'mousedown',
         this.onViewportMouseDown,
       );
@@ -198,17 +190,16 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
     }
     this.lastUpdateTime = now;
 
-    console.log('drawMinimap');
+    this.log('drawMinimap');
     if (!this.flowComponent || !this.minimapG || !this.viewportRect) return;
 
     const mainFlowNodes = this.flowComponent.list;
     if (!mainFlowNodes || mainFlowNodes.length === 0) return;
 
     // Clear previous minimap content
-    while (this.minimapG.nativeElement.firstChild) {
-      this.minimapG.nativeElement.removeChild(
-        this.minimapG.nativeElement.firstChild,
-      );
+    const minimapG = this.minimapG().nativeElement;
+    while (minimapG.firstChild) {
+      minimapG.removeChild(minimapG.firstChild);
     }
 
     // Calculate overall bounds of the main flow content
@@ -228,7 +219,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
 
     // Determine minimap scale based on content size and minimap container size
     const minimapContainerRect =
-      this.minimapSvg.nativeElement.getBoundingClientRect();
+      this.minimapSvg().nativeElement.getBoundingClientRect();
     const scaleX = minimapContainerRect.width / contentWidth;
     const scaleY = minimapContainerRect.height / contentHeight;
     this.minimapScale = Math.min(scaleX, scaleY) * 0.9; // Add some padding
@@ -264,7 +255,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
         (node.elRect.height * this.minimapScale).toString(),
       );
       rect.classList.add('minimap-node');
-      this.minimapG.nativeElement.appendChild(rect);
+      this.minimapG().nativeElement.appendChild(rect);
     });
 
     // Render connections on minimap (simplified as straight lines)
@@ -315,7 +306,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
             ).toString(),
           );
           line.classList.add('minimap-connection');
-          this.minimapG.nativeElement.appendChild(line);
+          this.minimapG().nativeElement.appendChild(line);
         }
       });
     }
@@ -332,7 +323,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
     const mainFlowRect =
       this.flowComponent.el.nativeElement.getBoundingClientRect();
     const minimapContainerRect =
-      this.minimapSvg.nativeElement.getBoundingClientRect();
+      this.minimapSvg().nativeElement.getBoundingClientRect();
 
     // Calculate overall bounds of the main flow content (same as in drawMinimap)
     let minX = Infinity,
@@ -376,13 +367,13 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
     const viewportY =
       (-currentPanY * currentMinimapScale) / currentScale + translateY;
 
-    this.viewportRect.nativeElement.setAttribute('x', viewportX.toString());
-    this.viewportRect.nativeElement.setAttribute('y', viewportY.toString());
-    this.viewportRect.nativeElement.setAttribute(
+    this.viewportRect().nativeElement.setAttribute('x', viewportX.toString());
+    this.viewportRect().nativeElement.setAttribute('y', viewportY.toString());
+    this.viewportRect().nativeElement.setAttribute(
       'width',
       viewportWidth.toString(),
     );
-    this.viewportRect.nativeElement.setAttribute(
+    this.viewportRect().nativeElement.setAttribute(
       'height',
       viewportHeight.toString(),
     );
@@ -392,7 +383,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     this.isDraggingViewport = true;
-    const minimapRect = this.minimapSvg.nativeElement.getBoundingClientRect();
+    const minimapRect = this.minimapSvg().nativeElement.getBoundingClientRect();
     this.dragStartX = event.clientX - minimapRect.left;
     this.dragStartY = event.clientY - minimapRect.top;
   };
@@ -403,7 +394,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
 
-    const minimapRect = this.minimapSvg.nativeElement.getBoundingClientRect();
+    const minimapRect = this.minimapSvg().nativeElement.getBoundingClientRect();
     const currentX = event.clientX - minimapRect.left;
     const currentY = event.clientY - minimapRect.top;
 
@@ -437,5 +428,10 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
     this.subscriptions.forEach((sub) => sub.unsubscribe());
     document.removeEventListener('mousemove', this.onViewportMouseMove);
     document.removeEventListener('mouseup', this.onViewportMouseUp);
+  }
+
+  // just for debugging
+  log(...args: any[]) {
+    // console.log(...args);
   }
 }

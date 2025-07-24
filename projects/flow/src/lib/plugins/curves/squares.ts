@@ -1,4 +1,4 @@
-import { ArrowPathFn } from '@ngu/flow';
+import { ArrowPathFn } from '../../flow-interface';
 
 export const squarePath: ArrowPathFn = (start, end, arrowSize, strokeWidth) => {
   const { x: startX, y: startY } = start;

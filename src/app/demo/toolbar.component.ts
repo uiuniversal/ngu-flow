@@ -11,7 +11,6 @@ import {
 
 @Component({
   selector: 'app-toolbar',
-  standalone: true,
   imports: [ReactiveFormsModule],
   template: `<div class="flex items-center gap-3">
     <button (click)="trigger()">Auto Arrange</button>

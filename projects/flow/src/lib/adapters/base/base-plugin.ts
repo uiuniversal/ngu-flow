@@ -1,5 +1,6 @@
 import { FlowPlugin } from '../interfaces/flow-plugin.interface';
 import { FlowNode } from '../../core/entities';
+import { FlowComponent } from '../../flow.component';
 
 // Import ChildInfo from framework layer since it contains DOM references
 interface ChildInfo {
@@ -13,7 +14,7 @@ interface ChildInfo {
  * Provides common functionality and standardized patterns.
  */
 export abstract class BasePlugin implements FlowPlugin {
-  protected data!: any; // FlowComponent reference
+  protected data!: FlowComponent; // FlowComponent reference
   protected list!: ChildInfo[];
 
   /**
@@ -53,14 +54,14 @@ export abstract class BasePlugin implements FlowPlugin {
    * Get container bounds
    */
   protected getContainerRect(): DOMRect {
-    return this.data.zoomContainer.nativeElement.getBoundingClientRect();
+    return this.data.zoomContainer().nativeElement.getBoundingClientRect();
   }
 
   /**
    * Get SVG group element for drawing
    */
   protected getSvgGroup(): SVGGElement {
-    return this.data.g.nativeElement;
+    return this.data.g().nativeElement;
   }
 
   /**

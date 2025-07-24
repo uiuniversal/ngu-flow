@@ -1,5 +1,5 @@
-import { Injectable, NgZone } from '@angular/core';
-import { BehaviorSubject, Subject } from 'rxjs';
+import { Injectable, NgZone, signal } from '@angular/core';
+import { Subject } from 'rxjs';
 import { FlowManager } from '../../core/use-cases/flow-manager';
 import { IFlowPresenter, IFlowGateway } from '../../core/use-cases/interfaces';
 import {
@@ -26,9 +26,9 @@ export class FlowAdapterService implements IFlowPresenter, IFlowGateway {
   layoutUpdated = new Subject<void>();
   arrowsChange = new Subject<FlowNode>();
 
-  // UI interaction subjects
-  enableChildDragging = new BehaviorSubject(true);
-  enableZooming = new BehaviorSubject(true);
+  // UI interaction signals
+  enableChildDragging = signal(true);
+  enableZooming = signal(true);
   onMouse = new Subject<MouseEvent>();
   startConnection = new Subject<{
     event: MouseEvent;
@@ -118,8 +118,7 @@ export class FlowAdapterService implements IFlowPresenter, IFlowGateway {
 
   // Zoom and pan handling
   handleWheel(event: WheelEvent, clientX: number, clientY: number): void {
-    if (!this.flowManager.getConfig().zooming || !this.enableZooming.value)
-      return;
+    if (!this.flowManager.getConfig().zooming || !this.enableZooming()) return;
     if (
       this.flowManager.isDraggingZoomContainerActive() ||
       this.flowManager.isChildDraggingActive()

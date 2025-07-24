@@ -1,4 +1,4 @@
-import { ArrowPathFn } from '@ngu/flow';
+import { ArrowPathFn } from '../../flow-interface';
 
 export const bezierPath: ArrowPathFn = (start, end, arrowSize, strokeWidth) => {
   let { x: startX, y: startY } = start;

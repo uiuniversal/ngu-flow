@@ -1,4 +1,4 @@
-import { ArrowPathFn } from '@ngu/flow';
+import { ArrowPathFn } from '../../flow-interface';
 
 export const blendCorners1: ArrowPathFn = (
   start,

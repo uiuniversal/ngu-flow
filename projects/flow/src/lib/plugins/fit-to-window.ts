@@ -11,6 +11,7 @@ export class FitToWindow extends BasePlugin {
   private containerPadding = 0;
   private configManager: PluginConfigManager<FitToWindowConfig>;
   private originalContainerSize!: { width: number; height: number };
+  private hasInitialFit = false;
 
   constructor(init = false, config?: Partial<FitToWindowConfig>) {
     super();
@@ -32,8 +33,17 @@ export class FitToWindow extends BasePlugin {
 
   override afterInit(data: FlowComponent): void {
     this.setData(data);
-    if (this.configManager.isEnabled()) {
-      this.fitToWindow();
+    // Don't fit immediately, wait for afterUpdate when DOM is ready
+  }
+
+  override afterUpdate(data: FlowComponent): void {
+    this.setData(data);
+    if (this.configManager.isEnabled() && !this.hasInitialFit) {
+      // Use requestAnimationFrame to ensure DOM measurements are available
+      requestAnimationFrame(() => {
+        this.fitToWindow();
+        this.hasInitialFit = true;
+      });
     }
   }
 

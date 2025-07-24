@@ -26,7 +26,6 @@ import { SnapGrid } from 'projects/flow/src/lib/plugins/snap-grid';
 
 @Component({
   selector: 'app-chain',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FlowComponent,
@@ -54,6 +53,7 @@ import { SnapGrid } from 'projects/flow/src/lib/plugins/snap-grid';
         [config]="config"
         [nodes]="list()"
         [edges]="edges()"
+        (connectionCreated)="onConnectionCreated($event)"
       >
         @for (item of list(); track item.id; let i = $index) {
           <div
@@ -486,6 +486,11 @@ export class ChainComponent implements AfterViewInit {
       }
       this.linkingFrom = null;
     }
+  }
+
+  onConnectionCreated(edge: FlowEdge) {
+    console.log('onConnectionCreated', edge);
+    this.edges.set([...this.edges(), edge]);
   }
 }
 
